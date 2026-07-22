@@ -172,142 +172,142 @@ jobs:
           echo "找到 Manager APK: $APK_PATH"
           export APK_PATH
           python3 << 'PYEOF'
-import hashlib, os, struct
+          import hashlib, os, struct
 
-apk_path = os.environ['APK_PATH']
-if not apk_path or not os.path.exists(apk_path):
-    with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-        f.write('expected_size=\n')
-        f.write('expected_hash=\n')
-    print('未找到 APK 文件')
-    exit(0)
+          apk_path = os.environ['APK_PATH']
+          if not apk_path or not os.path.exists(apk_path):
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write('expected_size=\n')
+                  f.write('expected_hash=\n')
+              print('未找到 APK 文件')
+              exit(0)
 
-def get_apk_signature(path):
-    """Parse APK Signing Block v2 to extract certificate (same as ksud apk_sign.rs)"""
-    with open(path, 'rb') as f:
-        data = f.read()
-    
-    file_len = len(data)
-    
-    # Find EOCD record (search backwards) — same logic as ksud
-    i = 0
-    eocd_offset = None
-    while i <= 0xffff:
-        n_pos = file_len - i - 2
-        if n_pos < 0:
-            break
-        n = struct.unpack_from('<H', data, n_pos)[0]
-        if n == i:
-            # Check EOCD signature at offset (n_pos - 20)
-            # In ksud: seek(End(-i-2)), read 2 bytes (pos now at file_len-i), seek(-22)
-            # -> reads at file_len - i - 22
-            eocd_check = n_pos - 20  # = file_len - i - 2 - 20 = file_len - i - 22
-            if eocd_check >= 0 and struct.unpack_from('<I', data, eocd_check)[0] == 0x06054b50:
-                eocd_offset = eocd_check
-                break
-        i += 1
-    
-    if eocd_offset is None:
-        print('无法找到 EOCD 记录')
-        return None
-    
-    # Read central directory offset
-    cd_offset = struct.unpack_from('<I', data, eocd_offset + 16)[0]
-    
-    # Find APK Sig Block 42
-    # pos = cd_offset - 0x18
-    sig_block_pos = cd_offset - 0x18
-    sig_block_size = struct.unpack_from('<Q', data, sig_block_pos)[0]
-    magic = data[sig_block_pos + 8:sig_block_pos + 24]
-    if magic != b'APK Sig Block 42':
-        print(f'未找到 APK Sig Block 42, magic={magic}')
-        return None
-    
-    # Parse signing block pairs
-    # pos = cd_offset - (sig_block_size + 8)
-    # Then read size_of_block (8 bytes), verify it matches sig_block_size
-    pos = cd_offset - (sig_block_size + 8)
-    read_size = struct.unpack_from('<Q', data, pos)[0]
-    if read_size != sig_block_size:
-        print(f'size mismatch: {read_size} != {sig_block_size}')
-        return None
-    pos += 8  # skip first size_of_block
-    
-    # Iterate over pairs
-    while True:
-        pair_size = struct.unpack_from('<Q', data, pos)[0]
-        if pair_size == sig_block_size:
-            break  # end marker
-        
-        pair_id = struct.unpack_from('<I', data, pos + 8)[0]
-        
-        if pair_id == 0x7109871a:  # V2 signing block
-            # Parse V2 block — same as ksud calc_cert_sha256
-            v2_pos = pos + 12  # after pair_size(8) + pair_id(4)
-            
-            offset = 4
-            
-            # signer-sequence length
-            signer_seq_len = struct.unpack_from('<I', data, v2_pos)[0]
-            v2_pos += 4
-            
-            # signer length
-            signer_len = struct.unpack_from('<I', data, v2_pos)[0]
-            v2_pos += 4
-            
-            # signed data length
-            signed_data_len = struct.unpack_from('<I', data, v2_pos)[0]
-            v2_pos += 4
-            offset += 0x4 * 3  # 12
-            
-            # digests-sequence length
-            digests_seq_len = struct.unpack_from('<I', data, v2_pos)[0]
-            v2_pos += 4 + digests_seq_len  # skip digests
-            offset += 0x4 + digests_seq_len
-            
-            # certificates length
-            certs_len = struct.unpack_from('<I', data, v2_pos)[0]
-            v2_pos += 4
-            offset += 0x4
-            
-            # certificate length
-            cert_len = struct.unpack_from('<I', data, v2_pos)[0]
-            v2_pos += 4
-            offset += 0x4
-            
-            # Read certificate
-            cert_data = data[v2_pos:v2_pos + cert_len]
-            if len(cert_data) != cert_len:
-                print(f'证书读取不完整: {len(cert_data)} vs {cert_len}')
-                return None
-            
-            return cert_data
-        
-        # Move to next pair: pos += pair_size - 4 (id bytes already consumed)
-        pos += pair_size - 4
-    
-    print('未找到 V2 签名块')
-    return None
+          def get_apk_signature(path):
+              """Parse APK Signing Block v2 to extract certificate (same as ksud apk_sign.rs)"""
+              with open(path, 'rb') as f:
+                  data = f.read()
+              
+              file_len = len(data)
+              
+              # Find EOCD record (search backwards) — same logic as ksud
+              i = 0
+              eocd_offset = None
+              while i <= 0xffff:
+                  n_pos = file_len - i - 2
+                  if n_pos < 0:
+                      break
+                  n = struct.unpack_from('<H', data, n_pos)[0]
+                  if n == i:
+                      # Check EOCD signature at offset (n_pos - 20)
+                      # In ksud: seek(End(-i-2)), read 2 bytes (pos now at file_len-i), seek(-22)
+                      # -> reads at file_len - i - 22
+                      eocd_check = n_pos - 20  # = file_len - i - 2 - 20 = file_len - i - 22
+                      if eocd_check >= 0 and struct.unpack_from('<I', data, eocd_check)[0] == 0x06054b50:
+                          eocd_offset = eocd_check
+                          break
+                  i += 1
+              
+              if eocd_offset is None:
+                  print('无法找到 EOCD 记录')
+                  return None
+              
+              # Read central directory offset
+              cd_offset = struct.unpack_from('<I', data, eocd_offset + 16)[0]
+              
+              # Find APK Sig Block 42
+              # pos = cd_offset - 0x18
+              sig_block_pos = cd_offset - 0x18
+              sig_block_size = struct.unpack_from('<Q', data, sig_block_pos)[0]
+              magic = data[sig_block_pos + 8:sig_block_pos + 24]
+              if magic != b'APK Sig Block 42':
+                  print(f'未找到 APK Sig Block 42, magic={magic}')
+                  return None
+              
+              # Parse signing block pairs
+              # pos = cd_offset - (sig_block_size + 8)
+              # Then read size_of_block (8 bytes), verify it matches sig_block_size
+              pos = cd_offset - (sig_block_size + 8)
+              read_size = struct.unpack_from('<Q', data, pos)[0]
+              if read_size != sig_block_size:
+                  print(f'size mismatch: {read_size} != {sig_block_size}')
+                  return None
+              pos += 8  # skip first size_of_block
+              
+              # Iterate over pairs
+              while True:
+                  pair_size = struct.unpack_from('<Q', data, pos)[0]
+                  if pair_size == sig_block_size:
+                      break  # end marker
+                  
+                  pair_id = struct.unpack_from('<I', data, pos + 8)[0]
+                  
+                  if pair_id == 0x7109871a:  # V2 signing block
+                      # Parse V2 block — same as ksud calc_cert_sha256
+                      v2_pos = pos + 12  # after pair_size(8) + pair_id(4)
+                      
+                      offset = 4
+                      
+                      # signer-sequence length
+                      signer_seq_len = struct.unpack_from('<I', data, v2_pos)[0]
+                      v2_pos += 4
+                      
+                      # signer length
+                      signer_len = struct.unpack_from('<I', data, v2_pos)[0]
+                      v2_pos += 4
+                      
+                      # signed data length
+                      signed_data_len = struct.unpack_from('<I', data, v2_pos)[0]
+                      v2_pos += 4
+                      offset += 0x4 * 3  # 12
+                      
+                      # digests-sequence length
+                      digests_seq_len = struct.unpack_from('<I', data, v2_pos)[0]
+                      v2_pos += 4 + digests_seq_len  # skip digests
+                      offset += 0x4 + digests_seq_len
+                      
+                      # certificates length
+                      certs_len = struct.unpack_from('<I', data, v2_pos)[0]
+                      v2_pos += 4
+                      offset += 0x4
+                      
+                      # certificate length
+                      cert_len = struct.unpack_from('<I', data, v2_pos)[0]
+                      v2_pos += 4
+                      offset += 0x4
+                      
+                      # Read certificate
+                      cert_data = data[v2_pos:v2_pos + cert_len]
+                      if len(cert_data) != cert_len:
+                          print(f'证书读取不完整: {len(cert_data)} vs {cert_len}')
+                          return None
+                      
+                      return cert_data
+                  
+                  # Move to next pair: pos += pair_size - 4 (id bytes already consumed)
+                  pos += pair_size - 4
+              
+              print('未找到 V2 签名块')
+              return None
 
-cert = get_apk_signature(apk_path)
-if cert is None:
-    with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-        f.write('expected_size=\n')
-        f.write('expected_hash=\n')
-    print('证书提取失败')
-    exit(0)
+          cert = get_apk_signature(apk_path)
+          if cert is None:
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write('expected_size=\n')
+                  f.write('expected_hash=\n')
+              print('证书提取失败')
+              exit(0)
 
-cert_len = len(cert)
-size_hex = f'0x{cert_len:04x}'
-sha256_hash = hashlib.sha256(cert).hexdigest()
+          cert_len = len(cert)
+          size_hex = f'0x{cert_len:04x}'
+          sha256_hash = hashlib.sha256(cert).hexdigest()
 
-print(f'证书大小: {size_hex} ({cert_len} bytes)')
-print(f'SHA256: {sha256_hash}')
+          print(f'证书大小: {size_hex} ({cert_len} bytes)')
+          print(f'SHA256: {sha256_hash}')
 
-with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-    f.write(f'expected_size={size_hex}\n')
-    f.write(f'expected_hash={sha256_hash}\n')
-PYEOF
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'expected_size={size_hex}\n')
+              f.write(f'expected_hash={sha256_hash}\n')
+          PYEOF
           echo "证书信息提取完成"
 
       - name: 添加 SUSFS 模块
