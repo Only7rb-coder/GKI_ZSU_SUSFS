@@ -290,8 +290,9 @@ jobs:
           echo "SUSFS 仓库最新提交日期: $SUSFS_LATEST_COMMIT_DATE"
 
           echo "准备补丁资源..."
-          git clone https://github.com/WildKernels/kernel_patches.git
-          git clone https://github.com/ShirkNeko/SukiSU_patch.git
+          rm -rf kernel_patches SukiSU_patch Action-Build
+          git clone https://github.com/WildKernels/kernel_patches.git --depth=1
+          git clone https://github.com/ShirkNeko/SukiSU_patch.git --depth=1
           echo "使用当前仓库补丁目录: $ZZH_PATCHES"
           git clone https://github.com/Numbersf/Action-Build.git --depth=1
 
@@ -1338,9 +1339,12 @@ jobs:
 
             # Build ZSU manager signature flags (passed via ccflags)
             KSU_SIG_FLAGS=""
-            if [ -n "${{ inputs.expected_size }}" ] && [ -n "${{ inputs.expected_hash }}" ]; then
-              KSU_SIG_FLAGS="KSU_EXPECTED_SIZE=${{ inputs.expected_size }} KSU_EXPECTED_HASH=${{ inputs.expected_hash }}"
-              echo "将使用 ZSU 管理器签名验证: size=${{ inputs.expected_size }}, hash=${{ inputs.expected_hash }}"
+            # Check if inputs are non-empty and not just single quotes
+            EXP_SIZE=$(echo "${{ inputs.expected_size }}" | tr -d "'")
+            EXP_HASH=$(echo "${{ inputs.expected_hash }}" | tr -d "'")
+            if [ -n "$EXP_SIZE" ] && [ -n "$EXP_HASH" ]; then
+              KSU_SIG_FLAGS="KSU_EXPECTED_SIZE=$EXP_SIZE KSU_EXPECTED_HASH=$EXP_HASH"
+              echo "将使用 ZSU 管理器签名验证: size=$EXP_SIZE, hash=$EXP_HASH"
             else
               echo "未提供 ZSU 管理器签名，将使用官方 KernelSU 签名回退"
             fi
