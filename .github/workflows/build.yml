@@ -260,11 +260,11 @@ jobs:
       - name: 克隆依赖仓库
         run: |
           ANYKERNEL_BRANCH="master"
-          SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
+          SUSFS_BRANCH="gki-${{ inputs.android_version }}-$(echo ${{ inputs.kernel_version }} | cut -d. -f1-2)"
 
           echo "克隆 AnyKernel3..."
           rm -rf AnyKernel3
-          git clone https://github.com/ZSU-GKI/AnyKernel3.git -b "master" --depth=1
+          git clone https://github.com/ZyCromerZ/AnyKernel3.git -b "master" --depth=1
           rm -rf AnyKernel3/.git
 
           echo "克隆 SUSFS (分支: $SUSFS_BRANCH)..."
@@ -295,7 +295,7 @@ jobs:
           echo "准备补丁资源..."
           rm -rf kernel_patches SukiSU_patch Action-Build
           git clone https://github.com/WildKernels/kernel_patches.git --depth=1
-          git clone https://github.com/ShirkNeko/SukiSU_patch.git --depth=1
+          git clone https://github.com/SukiSU-Ultra/SukiSU_patch.git --depth=1
           echo "使用当前仓库补丁目录: $ZZH_PATCHES"
           git clone https://github.com/Numbersf/Action-Build.git --depth=1
 
