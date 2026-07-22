@@ -115,6 +115,14 @@ on:
         required: false
         type: boolean
         default: false
+      expected_size:
+        required: false
+        type: string
+        default: ''
+      expected_hash:
+        required: false
+        type: string
+        default: ''
 
 jobs:
   build-custom-kernel:
@@ -139,6 +147,8 @@ jobs:
       enable_susfs: ${{ !inputs.cancel_susfs }}
       droidspaces: ${{ inputs.droidspaces || 'off' }}
       droidspaces_ntsync: ${{ inputs.droidspaces_ntsync || false }}
+      expected_size: ${{ inputs.expected_size || '' }}
+      expected_hash: ${{ inputs.expected_hash || '' }}
 
   get-ksu-manager:
     uses: ./.github/workflows/get-manager.yml
