@@ -263,12 +263,14 @@ jobs:
           SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
 
           echo "克隆 AnyKernel3..."
-          git clone https://github.com/ZSU-GKI/AnyKernel3.git -b "master"
+          rm -rf AnyKernel3
+          git clone https://github.com/ZSU-GKI/AnyKernel3.git -b "master" --depth=1
           rm -rf AnyKernel3/.git
 
           echo "克隆 SUSFS (分支: $SUSFS_BRANCH)..."
           # ZSU 使用 simonpunk 的原版 SUSFS
-          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH"
+          rm -rf susfs4ksu
+          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b "$SUSFS_BRANCH" --depth=1
 
           # 检查是否启用自定义提交
           CONFIG_FILE="config/config"
@@ -279,6 +281,7 @@ jobs:
               if [ -n "$CUSTOM_COMMIT" ]; then
                 echo "切换 SUSFS 到自定义提交: $CUSTOM_COMMIT"
                 cd susfs4ksu
+                git fetch --unshallow || true
                 git checkout "$CUSTOM_COMMIT"
                 cd ..
               fi
