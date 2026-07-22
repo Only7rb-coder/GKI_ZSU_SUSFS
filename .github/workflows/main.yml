@@ -216,6 +216,8 @@ jobs:
       cancel_susfs: ${{ inputs.cancel_susfs }}
       droidspaces: ${{ inputs.droidspaces }}
       droidspaces_ntsync: ${{ inputs.droidspaces_ntsync }}
+      expected_size: ${{ needs.get-manager.outputs.expectedSize }}
+      expected_hash: ${{ needs.get-manager.outputs.expectedHash }}
       called_from_main: true
 
   # ==================== Android 16 - 6.12 构建 ====================

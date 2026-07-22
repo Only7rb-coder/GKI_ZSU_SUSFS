@@ -1347,7 +1347,7 @@ jobs:
 
             if [ -f "build/build.sh" ]; then
               # 5.x 内核使用传统构建脚本
-              LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="/usr/bin/ccache clang" $KSU_SIG_FLAGS || exit 1
+              LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="/usr/bin/ccache clang" EXTRA_CFLAGS="$KSU_SIG_FLAGS" || exit 1
               strings "out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image" | grep 'Linux version'
             else
               # 6.1+ 内核使用 Bazel 构建
@@ -1369,9 +1369,13 @@ jobs:
                 LTO_FLAG="--lto=none"
               fi
               # Append signature flags to bazel build
+              # Bazel needs to pass these as defines to the compiler
               SIG_FLAG=""
               if [ -n "$KSU_SIG_FLAGS" ]; then
-                SIG_FLAG="$KSU_SIG_FLAGS"
+                # Convert "KSU_EXPECTED_SIZE=0x... KSU_EXPECTED_HASH=..." to "--copt=-DKSU_EXPECTED_SIZE=0x... --copt=-DKSU_EXPECTED_HASH=..."
+                for arg in $KSU_SIG_FLAGS; do
+                  SIG_FLAG="$SIG_FLAG --copt=-D$arg"
+                done
               fi
               tools/bazel build --disk_cache=/home/runner/.cache/bazel --config=fast $LTO_FLAG $FRAG_FLAG $SIG_FLAG //common:kernel_aarch64_dist || exit 1
               strings ./bazel-bin/common/kernel_aarch64/Image | grep 'Linux version'
