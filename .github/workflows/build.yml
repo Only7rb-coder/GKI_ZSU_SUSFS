@@ -255,7 +255,7 @@ jobs:
 
           echo "克隆 AnyKernel3..."
           # Temporary integration-test refs; replace with master after the corresponding PRs merge.
-          git clone https://github.com/Only7rb-coder/ZSU-GKI-AnyKernel3.git -b "fix/zsu-manager-anykernel-support"
+          git clone https://github.com/Only7rb-coder/ZSU-GKI-AnyKernel3.git -b "fix/zsu-manager-anykernel-support" AnyKernel3
           rm -rf AnyKernel3/.git
 
           echo "克隆 SUSFS (分支: $SUSFS_BRANCH)..."
