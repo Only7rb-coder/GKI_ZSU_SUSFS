@@ -23,8 +23,8 @@ jobs:
   get_ksu_manager:
     runs-on: ubuntu-latest
     outputs:
-      # 输出1: KSU版本号
-      ksuVer: ${{ steps.get_version.outputs.kversion }}
+      # 输出1: ZSU manager 的实际版本标签（从 APK 文件名读取）
+      ksuVer: ${{ steps.manager_version.outputs.kversion }}
       # 输出2: SUSFS版本号
       susVer: ${{ steps.get_version.outputs.sversion }}
     env:
@@ -143,8 +143,36 @@ jobs:
             curl -L -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -o "$ZIP_NAME" "$URL"
             mkdir -p "manager-artifacts/$SAFE_NAME"
             unzip -o "$ZIP_NAME" -d "manager-artifacts/$SAFE_NAME"
+            # 兼容旧版 CI：将旧 Custom_widgets 文件名统一改为 ZSU。
+            find "manager-artifacts/$SAFE_NAME" -type f -name 'Custom_widgets_*.apk' -print0 | while IFS= read -r -d '' APK; do
+              NEW_APK="$(dirname "$APK")/$(basename "$APK" | sed 's/^Custom_widgets_/ZSU_/')"
+              mv -f "$APK" "$NEW_APK"
+            done
             rm -rf "$ZIP_NAME"
           done
+
+      - name: 读取管理器实际版本
+        id: manager_version
+        if: steps.add_KSU.outcome == 'success'
+        run: |
+          set -euo pipefail
+          APK=$(find manager-artifacts -type f -name '*.apk' ! -name '*spoofed*' | sort | head -n 1)
+          if [ -z "$APK" ]; then
+            APK=$(find manager-artifacts -type f -name '*.apk' | sort | head -n 1)
+          fi
+          if [ -z "$APK" ]; then
+            echo '::error::未找到 ZSU manager APK，无法读取实际版本'
+            exit 1
+          fi
+          FILE=$(basename "$APK")
+          LABEL=$(printf '%s' "$FILE" | sed -E 's/^(ZSU|Custom_widgets)_//; s/-release\.apk$//')
+          if [ -z "$LABEL" ] || [ "$LABEL" = "$FILE" ]; then
+            echo "::error::无法从 APK 文件名读取 manager 版本: $FILE"
+            exit 1
+          fi
+          echo "ZSU manager version: $LABEL"
+          echo "KSU_VERSION=$LABEL" >> "$GITHUB_ENV"
+          echo "kversion=$LABEL" >> "$GITHUB_OUTPUT"
 
       - name: 添加 SUSFS 模块
         id: add_SUSFS
@@ -194,7 +222,7 @@ jobs:
         if: steps.add_KSU.outcome == 'success'
         uses: actions/upload-artifact@v6
         with:
-          name: ZSU-Manager(${{ env.KSU_VERSION }})
+          name: ZSU-Manager(${{ steps.manager_version.outputs.kversion }})
           path: |
             **/*.apk
 
