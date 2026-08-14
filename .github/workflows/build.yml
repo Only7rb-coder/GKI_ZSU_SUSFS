@@ -494,6 +494,39 @@ jobs:
               ;;
             "Next"|"SukiSU"|"ZSU")
               echo "Next/SukiSU/ZSU 使用内置 SUSFS 支持"
+
+              # The Android 15/6.6 SUSFS patch calls these helpers from the
+              # common kernel.  dev-susfs already contains their bodies in
+              # selinux_hide.c, but older declarations are still `static`,
+              # which leaves local symbols and breaks the final vmlinux link.
+              # Export only the matching helpers and keep this idempotent so
+              # reruns do not create duplicate edits.
+              SELINUX_HIDE=""
+              for candidate in \
+                "$KERNEL_ROOT/KernelSU-Next/kernel/feature/selinux_hide.c" \
+                "$KERNEL_ROOT/KernelSU/kernel/feature/selinux_hide.c" \
+                "$KERNEL_ROOT/SukiSU/kernel/feature/selinux_hide.c"; do
+                if [ -f "$candidate" ] && grep -q 'security_context_to_sid_with_policy' "$candidate"; then
+                  SELINUX_HIDE="$candidate"
+                  break
+                fi
+              done
+
+              if [ -z "$SELINUX_HIDE" ]; then
+                echo "::warning::No KernelSU selinux_hide.c found; no SUSFS helper export adjustment was needed."
+              else
+                sed -i \
+                  -e 's/^static int security_context_to_sid_with_policy(/int security_context_to_sid_with_policy(/' \
+                  -e 's/^static int security_sid_to_context_with_policy(/int security_sid_to_context_with_policy(/' \
+                  -e 's/^static void \(__nocfi \)\?security_compute_av_user_with_policy(/void \1security_compute_av_user_with_policy(/' \
+                  "$SELINUX_HIDE"
+
+                if grep -qE '^static (int security_context_to_sid_with_policy|int security_sid_to_context_with_policy|void (__nocfi )?security_compute_av_user_with_policy)' "$SELINUX_HIDE"; then
+                  echo "::error::SUSFS SELinux helper declarations remain static in $SELINUX_HIDE"
+                  exit 1
+                fi
+                echo "SUSFS helper exports enabled in $SELINUX_HIDE"
+              fi
               ;;
           esac
 
