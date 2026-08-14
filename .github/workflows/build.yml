@@ -254,7 +254,8 @@ jobs:
           SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
 
           echo "克隆 AnyKernel3..."
-          git clone https://github.com/Only7rb-coder/ZSU-GKI-AnyKernel3.git -b "master"
+          # Temporary integration-test refs; replace with master after the corresponding PRs merge.
+          git clone https://github.com/Only7rb-coder/ZSU-GKI-AnyKernel3.git -b "fix/zsu-manager-anykernel-support"
           rm -rf AnyKernel3/.git
 
           echo "克隆 SUSFS (分支: $SUSFS_BRANCH)..."
@@ -443,7 +444,7 @@ jobs:
         working-directory: ${{ env.KERNEL_ROOT }}
         run: |
           echo "添加 ZSU..."
-          curl -LSs "https://raw.githubusercontent.com/Only7rb-coder/ZSU/main/kernel/setup.sh" | bash $BRANCH
+          curl -LSs "https://raw.githubusercontent.com/Only7rb-coder/ZSU/fix/gki-use-private-zsu-fork/kernel/setup.sh" | bash $BRANCH
 
           if [ -d "KernelSU/.git" ]; then
             KSU_LATEST_COMMIT_DATE=$(git -C KernelSU log -1 --date=format:'%Y-%m-%d %H:%M:%S %z' --format='%cd')
