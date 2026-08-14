@@ -515,7 +515,7 @@ jobs:
         with:
           path: ./downloaded-artifacts
 
-      - name: 创建 GitHub Release
+      - name: 创建 GitHub Release 草稿
         run: |
           PRERELEASE_FLAG=""
           if [ "${{ inputs.release_type }}" == "Pre-Release" ]; then
@@ -523,40 +523,40 @@ jobs:
           fi
 
           gh release create "$NEW_TAG" \
+            --draft \
             --title "${{ env.RELEASE_NAME }}" \
             --notes-file release_body.md \
             --target "$GITHUB_SHA" \
             $PRERELEASE_FLAG
 
-      - name: 上传管理器和 SUSFS 模块
-        continue-on-error: true
+      - name: 上传全部发布资产
         run: |
-          echo "准备上传 APK 与 SUSFS 模块..."
-          apk_count=$(find ./downloaded-artifacts -type f -name "*.apk" | wc -l || true)
-          sus_count=$(find ./downloaded-artifacts -type f -path "./downloaded-artifacts/susfs-*/*" | wc -l || true)
-          echo "APK files: ${apk_count}"
-          echo "SUSFS files: ${sus_count}"
-          find ./downloaded-artifacts -type f -name "*.apk" -print0 | \
-          while IFS= read -r -d '' f; do
-            gh release upload "$NEW_TAG" "$f" || true
-          done
-          find ./downloaded-artifacts -type f -path "./downloaded-artifacts/susfs-*/*" -print0 | \
-          while IFS= read -r -d '' f; do
-            gh release upload "$NEW_TAG" "$f" || true
+          set -euo pipefail
+          echo "准备上传内核、AnyKernel、ZSU 管理器和 SUSFS 模块..."
+          mkdir -p release-assets
+          find ./downloaded-artifacts -type f \
+            \( -name "*.apk" -o -name "*.zip" -o -name "*.img" -o -name "*.ko" \) \
+            ! -path "*-Rejects/*" -print0 | \
+          while IFS= read -r -d '' file; do
+            cp -f "$file" "release-assets/$(basename "$file")"
           done
 
-      - name: 上传内核产物
-        run: |
-          for file in ./downloaded-artifacts/*_kernel-*/*; do
-            [ -d "$file" ] && continue
-            [[ "$file" == *-Rejects/* ]] && continue
-            echo "上传 $file..."
-            gh release upload "$NEW_TAG" "$file"
+          mapfile -t ASSETS < <(find release-assets -maxdepth 1 -type f -printf '%p\n' | sort)
+          if [ "${#ASSETS[@]}" -eq 0 ]; then
+            echo "::error::没有找到可上传的发布资产"
+            exit 1
+          fi
+
+          printf '将上传以下资产:\n'
+          printf ' - %s\n' "${ASSETS[@]}"
+          for file in "${ASSETS[@]}"; do
+            gh release upload "$NEW_TAG" "$file" --clobber
           done
 
-      - name: 将发布由draft转换为publish状态
+      - name: 发布 GitHub Release
         run: |
-          gh release edit --draft=false "$NEW_TAG"
+          gh release edit "$NEW_TAG" --draft=false
+          echo "Release published: https://github.com/$REPO_OWNER/$REPO_NAME/releases/tag/$NEW_TAG"
 
       - name: 构建摘要
         run: |
