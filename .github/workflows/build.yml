@@ -457,15 +457,20 @@ jobs:
 
           KSU_KBUILD="$KERNEL_ROOT/KernelSU-Next/kernel/Kbuild"
           ZSU_MANAGER_SIGNATURE="0x318:ba1159a5819dec96cdcb2498bef73170b0ba1735c12139bde1b7677bf7c5c2ab"
-          if ! grep -qF "$ZSU_MANAGER_SIGNATURE" "$KSU_KBUILD"; then
-            if grep -q '^KSU_NEXT_MANAGER_LIST :=' "$KSU_KBUILD"; then
-              sed -i "s|^KSU_NEXT_MANAGER_LIST := .*|&,$ZSU_MANAGER_SIGNATURE|" "$KSU_KBUILD"
-            else
-              echo "::error::SUSFS-capable KernelSU source has no KSU_NEXT_MANAGER_LIST"
-              exit 1
-            fi
+          if grep -q '^KSU_NEXT_MANAGER_LIST :=' "$KSU_KBUILD"; then
+            # ZSU is a private fork. Replace the upstream manager allowlist so
+            # a KernelSU-Next APK cannot be crowned by a ZSU kernel. Both the
+            # normal and spoofed ZSU APKs use this same signing certificate.
+            sed -i "s|^KSU_NEXT_MANAGER_LIST := .*|KSU_NEXT_MANAGER_LIST := $ZSU_MANAGER_SIGNATURE|" "$KSU_KBUILD"
+          else
+            echo "::error::SUSFS-capable KernelSU source has no KSU_NEXT_MANAGER_LIST"
+            exit 1
           fi
           grep -nF "$ZSU_MANAGER_SIGNATURE" "$KSU_KBUILD"
+          if grep -q '^KSU_NEXT_MANAGER_LIST := .*,' "$KSU_KBUILD"; then
+            echo "::error::ZSU manager allowlist still contains more than the private ZSU signature"
+            exit 1
+          fi
 
       # ==================== 应用 SUSFS 补丁 ====================
       # SUSFS (Super User SUS FileSystem) 用于隐藏 root 痕迹
