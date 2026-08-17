@@ -251,10 +251,19 @@ jobs:
       - name: 克隆依赖仓库
         run: |
           ANYKERNEL_BRANCH="master"
+          # Pin the header-v4/no-ramdisk fix so a mutable upstream branch cannot
+          # reintroduce "No ramdisk found to unpack" during flashing.
+          ANYKERNEL_COMMIT="6376962cd0651186d205ef287ff24f501398d6fd"
           SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
 
           echo "克隆 AnyKernel3..."
-          git clone https://github.com/Only7rb-coder/ZSU-GKI-AnyKernel3.git -b "master" AnyKernel3
+          git clone --depth 1 https://github.com/Only7rb-coder/ZSU-GKI-AnyKernel3.git -b "$ANYKERNEL_BRANCH" AnyKernel3
+          git -C AnyKernel3 fetch --depth 1 origin "$ANYKERNEL_COMMIT"
+          git -C AnyKernel3 checkout --detach "$ANYKERNEL_COMMIT"
+          # Android header-v4 GKI images may intentionally have RAMDISK_SZ=0.
+          # AnyKernel must split and flash them without requiring a ramdisk.
+          grep -q '^split_boot;$' AnyKernel3/anykernel.sh
+          ! grep -q '^dump_boot;$' AnyKernel3/anykernel.sh
           rm -rf AnyKernel3/.git
 
           echo "克隆 SUSFS (分支: $SUSFS_BRANCH)..."
