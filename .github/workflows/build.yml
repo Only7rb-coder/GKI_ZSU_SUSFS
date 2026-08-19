@@ -815,6 +815,11 @@ jobs:
                 fi
                 echo "已修复 exec.c 缺少 susfs_def.h 问题"
               fi
+              # Android 16 / 6.12 的 getname_flags() 已移除第三个参数；修正旧 SUSFS 调用点
+              if grep -qF 'fname = getname_flags(filename, lookup_flags, NULL);' ./fs/open.c; then
+                sed -i 's/fname = getname_flags(filename, lookup_flags, NULL);/fname = getname_flags(filename, lookup_flags);/' ./fs/open.c
+                echo "已修复 fs/open.c getname_flags() 参数数量"
+              fi
             fi
           fi
 
