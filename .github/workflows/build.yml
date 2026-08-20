@@ -98,7 +98,23 @@ jobs:
       CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
       CCACHE_NOHASHDIR: "true"
       CCACHE_HARDLINK: "true"
-
+      INPUT_ANDROID_VERSION: ${{ inputs.android_version }}
+      INPUT_BUILD_TIME: ${{ inputs.build_time }}
+      INPUT_CVE_PATCH: ${{ inputs.cve_2026_43499_patch }}
+      INPUT_DROIDSPACES: ${{ inputs.droidspaces }}
+      INPUT_DROIDSPACES_NTSYNC: ${{ inputs.droidspaces_ntsync }}
+      INPUT_ENABLE_SUSFS: ${{ inputs.enable_susfs }}
+      INPUT_KERNEL_VERSION: ${{ inputs.kernel_version }}
+      INPUT_KSU_BRANCH: ${{ inputs.ksu_branch }}
+      INPUT_KSU_VARIANT: ${{ inputs.ksu_variant }}
+      INPUT_OS_PATCH_LEVEL: ${{ inputs.os_patch_level }}
+      INPUT_REVISION: ${{ inputs.revision }}
+      INPUT_SUB_LEVEL: ${{ inputs.sub_level }}
+      INPUT_USE_BBG: ${{ inputs.use_bbg }}
+      INPUT_USE_KPM: ${{ inputs.use_kpm }}
+      INPUT_USE_REKERNEL: ${{ inputs.use_rekernel }}
+      INPUT_USE_ZRAM: ${{ inputs.use_zram }}
+      INPUT_VERSION: ${{ inputs.version }}
     steps:
       # ==================== 构建信息摘要 ====================
       # 打印当前构建的所有配置信息，方便调试和追踪
@@ -107,20 +123,20 @@ jobs:
           echo "========================================"
           echo "       内核构建配置摘要"
           echo "========================================"
-          echo "Android 版本  : ${{ inputs.android_version }}"
-          echo "内核版本      : ${{ inputs.kernel_version }}"
-          echo "子版本号      : ${{ inputs.sub_level }}"
-          echo "补丁级别      : ${{ inputs.os_patch_level }}"
+          echo "Android 版本  : $INPUT_ANDROID_VERSION"
+          echo "内核版本      : $INPUT_KERNEL_VERSION"
+          echo "子版本号      : $INPUT_SUB_LEVEL"
+          echo "补丁级别      : $INPUT_OS_PATCH_LEVEL"
           echo "KSU 变体      : ZSU"
-          echo "KSU 分支      : ${{ inputs.ksu_branch }}"
-          echo "构建时间      : ${{ inputs.build_time }}"
-          echo "SUSFS 状态    : ${{ inputs.enable_susfs }}"
-          echo "ZRAM 增强     : ${{ inputs.use_zram }}"
-          echo "BBG 补丁      : ${{ inputs.use_bbg }}"
-          echo "Re-Kernel     : ${{ inputs.use_rekernel }}"
-          echo "CVE-2026-43499: ${{ inputs.cve_2026_43499_patch }}"
-          echo "Droidspaces   : ${{ inputs.droidspaces }}"
-          echo "NTSync        : ${{ inputs.droidspaces_ntsync }}"
+          echo "KSU 分支      : $INPUT_KSU_BRANCH"
+          echo "构建时间      : $INPUT_BUILD_TIME"
+          echo "SUSFS 状态    : $INPUT_ENABLE_SUSFS"
+          echo "ZRAM 增强     : $INPUT_USE_ZRAM"
+          echo "BBG 补丁      : $INPUT_USE_BBG"
+          echo "Re-Kernel     : $INPUT_USE_REKERNEL"
+          echo "CVE-2026-43499: $INPUT_CVE_PATCH"
+          echo "Droidspaces   : $INPUT_DROIDSPACES"
+          echo "NTSync        : $INPUT_DROIDSPACES_NTSYNC"
           echo "Stock Config  : 自动检测 config/stock_defconfig"
           echo "========================================"
 
@@ -150,7 +166,7 @@ jobs:
       - name: 初始化构建环境
         run: |
           # 构建配置标识
-          CONFIG="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}"
+          CONFIG="$INPUT_ANDROID_VERSION-$INPUT_KERNEL_VERSION-$INPUT_SUB_LEVEL"
           KERNEL_ROOT="$GITHUB_WORKSPACE/$CONFIG"
           mkdir -p "$KERNEL_ROOT"
 
@@ -209,9 +225,9 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.ccache
-          key: ${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-ccache-${{ github.sha }}
+          key: $INPUT_ANDROID_VERSION-$INPUT_KERNEL_VERSION-$INPUT_SUB_LEVEL-ccache-${{ github.sha }}
           restore-keys: |
-            ${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.sub_level }}-ccache-
+            $INPUT_ANDROID_VERSION-$INPUT_KERNEL_VERSION-$INPUT_SUB_LEVEL-ccache-
 
       # ==================== 缓存工具链 ====================
       # 缓存 AOSP 构建工具，避免每次重新下载
@@ -254,7 +270,7 @@ jobs:
           # Pin the header-v4/no-ramdisk fix so a mutable upstream branch cannot
           # reintroduce "No ramdisk found to unpack" during flashing.
           ANYKERNEL_COMMIT="6376962cd0651186d205ef287ff24f501398d6fd"
-          SUSFS_BRANCH="gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}"
+          SUSFS_BRANCH="gki-$INPUT_ANDROID_VERSION-$INPUT_KERNEL_VERSION"
 
           echo "克隆 AnyKernel3..."
           git clone --depth 1 https://github.com/Only7rb-coder/ZSU-GKI-AnyKernel3.git -b "$ANYKERNEL_BRANCH" AnyKernel3
@@ -303,7 +319,7 @@ jobs:
           # 克隆 GCC 工具链 (用于 5.x 内核)
           git clone https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-6.4.1.git gcc
 
-          FORMATTED_BRANCH="${{ inputs.android_version }}-${{ inputs.kernel_version }}-${{ inputs.os_patch_level }}"
+          FORMATTED_BRANCH="$INPUT_ANDROID_VERSION-$INPUT_KERNEL_VERSION-$INPUT_OS_PATCH_LEVEL"
           echo "初始化 repo，分支: common-${FORMATTED_BRANCH}"
 
           $REPO init --depth=1 -u https://android.googlesource.com/kernel/manifest -b common-${FORMATTED_BRANCH} --repo-rev=v2.16
@@ -368,7 +384,7 @@ jobs:
       # 从 Makefile 中读取真实的 SUBLEVEL 值
       - name: 提取实际子版本号
         run: |
-          ACTUAL_SUBLEVEL="${{ inputs.sub_level }}"
+          ACTUAL_SUBLEVEL="$INPUT_SUB_LEVEL"
           if [[ -f "$KERNEL_ROOT/common/Makefile" ]]; then
             EXTRACTED=$(grep '^SUBLEVEL = ' "$KERNEL_ROOT/common/Makefile" | awk '{print $3}')
             [[ -n "$EXTRACTED" ]] && ACTUAL_SUBLEVEL="$EXTRACTED"
@@ -383,7 +399,7 @@ jobs:
         working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
           bash "$GITHUB_WORKSPACE/security_patch/apply_cve_2026_43499.sh" \
-            "${{ inputs.kernel_version }}" \
+            "$INPUT_KERNEL_VERSION" \
             "$ACTUAL_SUBLEVEL" \
             "$GITHUB_WORKSPACE/security_patch"
 
@@ -392,13 +408,13 @@ jobs:
       - name: 修复 glibc 2.38 兼容性
         working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
-          RAW_SUB="${{ inputs.sub_level }}"
+          RAW_SUB="$INPUT_SUB_LEVEL"
           [[ ! "$RAW_SUB" =~ ^[0-9]+$ ]] && CURRENT_SUB=99999 || CURRENT_SUB=$RAW_SUB
 
           NEEDS_FIX=false
-          if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.10" && $CURRENT_SUB -le 186 ]] ||
-             [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" && $CURRENT_SUB -le 119 ]] ||
-             [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "6.1" && $CURRENT_SUB -le 43 ]]; then
+          if [[ "$INPUT_ANDROID_VERSION" == "android13" && "$INPUT_KERNEL_VERSION" == "5.10" && $CURRENT_SUB -le 186 ]] ||
+             [[ "$INPUT_ANDROID_VERSION" == "android13" && "$INPUT_KERNEL_VERSION" == "5.15" && $CURRENT_SUB -le 119 ]] ||
+             [[ "$INPUT_ANDROID_VERSION" == "android14" && "$INPUT_KERNEL_VERSION" == "6.1" && $CURRENT_SUB -le 43 ]]; then
             NEEDS_FIX=true
           fi
 
@@ -408,7 +424,7 @@ jobs:
               echo "应用 glibc 2.38 兼容性修复..."
               sed -i '/\$(Q)\$(MAKE) -C \$(SUBCMD_SRC) OUTPUT=\$(abspath \$(dir \$@))\/ \$(abspath \$@)/s//$(Q)$(MAKE) -C $(SUBCMD_SRC) EXTRA_CFLAGS="$(CFLAGS)" OUTPUT=$(abspath $(dir $@))\/ $(abspath $@)/' tools/bpf/resolve_btfids/Makefile 2>/dev/null || true
 
-              if [[ "${{ inputs.kernel_version }}" == "5.10" || "${{ inputs.kernel_version }}" == "5.15" ]]; then
+              if [[ "$INPUT_KERNEL_VERSION" == "5.10" || "$INPUT_KERNEL_VERSION" == "5.15" ]]; then
                 sed -i '/char \*buf = NULL;/a int i;' tools/lib/subcmd/parse-options.c 2>/dev/null || true
                 sed -i 's/for (int i = 0; subcommands\[i\]; i++) {/for (i = 0; subcommands[i]; i++) {/' tools/lib/subcmd/parse-options.c 2>/dev/null || true
                 sed -i '/if (subcommands) {/a int i;' tools/lib/subcmd/parse-options.c 2>/dev/null || true
@@ -432,7 +448,7 @@ jobs:
       - name: 确定 KernelSU 分支
         id: ksu-branch
         run: |
-          branch_input="${{ inputs.ksu_branch }}"
+          branch_input="$INPUT_KSU_BRANCH"
 
           # 如果用户输入了自定义分支名或 commit hash，直接使用
           if [ -n "$branch_input" ]; then
@@ -489,11 +505,11 @@ jobs:
         run: |
           echo "应用 SUSFS 补丁..."
 
-          cp $SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch ./common/
+          cp $SUSFS4KSU/kernel_patches/50_add_susfs_in_gki-$INPUT_ANDROID_VERSION-$INPUT_KERNEL_VERSION.patch ./common/
           cp $SUSFS4KSU/kernel_patches/fs/* ./common/fs/
           cp $SUSFS4KSU/kernel_patches/include/linux/* ./common/include/linux/
 
-          case "${{ inputs.ksu_variant }}" in
+          case "$INPUT_KSU_VARIANT" in
             "Official")
               cd ./KernelSU
               cp $SUSFS4KSU/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
@@ -545,13 +561,13 @@ jobs:
           esac
 
           cd $KERNEL_ROOT/common
-          CURRENT_SUB="${{ inputs.sub_level }}"
+          CURRENT_SUB="$INPUT_SUB_LEVEL"
           if [[ ! "$CURRENT_SUB" =~ ^[0-9]+$ ]]; then
             CURRENT_SUB=99999
           fi
 
           # 在应用主补丁前临时调整源码上下文，替代已归档的 wild 修复小补丁
-          if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
+          if [[ "$INPUT_ANDROID_VERSION" == "android12" && "$INPUT_KERNEL_VERSION" == "5.10" ]]; then
             if [[ "$CURRENT_SUB" -le 43 ]]; then
               echo "临时调整 Android 12 5.10 base.c 上下文"
               perl -i -pe 's/(int|size_t)\s+this_len\s*=\s*min_t\s*\(\s*\1\s*,/size_t this_len = min_t(size_t,/;' fs/proc/base.c
@@ -564,7 +580,7 @@ jobs:
             fi
           fi
 
-          if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
+          if [[ "$INPUT_ANDROID_VERSION" == "android13" && "$INPUT_KERNEL_VERSION" == "5.10" ]]; then
             if [[ "$CURRENT_SUB" -le 107 ]]; then
               echo "临时调整 Android 13 5.10 fdinfo.c 上下文"
               sed -i '/^[[:space:]]*\/\*$/,/^[[:space:]]*u32 mask = mark->mask & IN_ALL_EVENTS;$/d' fs/notify/fdinfo.c
@@ -573,7 +589,7 @@ jobs:
             fi
           fi
 
-          if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" ]]; then
+          if [[ "$INPUT_ANDROID_VERSION" == "android13" && "$INPUT_KERNEL_VERSION" == "5.15" ]]; then
             if [[ "$CURRENT_SUB" -le 41 ]]; then
               echo "临时调整 Android 13 5.15 namespace.c/open.c/fdinfo.c 上下文"
               if ! grep -qF '#include <linux/mnt_idmapping.h>' fs/namespace.c; then
@@ -588,7 +604,7 @@ jobs:
             fi
           fi
 
-          if [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "6.1" ]]; then
+          if [[ "$INPUT_ANDROID_VERSION" == "android14" && "$INPUT_KERNEL_VERSION" == "6.1" ]]; then
             if [[ "$CURRENT_SUB" -le 25 ]] && ! grep -qF '#include <trace/hooks/sched.h>' fs/proc/base.c; then
               echo "临时调整 Android 14 6.1 sched.h 上下文"
               sed -i '/^#include <trace\/events\/oom.h>$/a #include <trace/hooks/sched.h>' fs/proc/base.c
@@ -603,7 +619,7 @@ jobs:
             fi
           fi
 
-          if [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
+          if [[ "$INPUT_ANDROID_VERSION" == "android15" && "$INPUT_KERNEL_VERSION" == "6.6" ]]; then
             if [[ "$CURRENT_SUB" -le 30 ]] && ! grep -qF 'last_vma_end = vma->vm_end;' fs/proc/task_mmu.c; then
               echo "临时调整 Android 15 6.6 task_mmu.c 上下文"
               sed -i '/smap_gather_stats(vma, &mss, last_vma_end);/a\last_vma_end = vma->vm_end;' fs/proc/task_mmu.c
@@ -618,17 +634,17 @@ jobs:
             fi
           fi
 
-          if [[ "${{ inputs.android_version }}" == "android16" && "${{ inputs.kernel_version }}" == "6.12" ]]; then
+          if [[ "$INPUT_ANDROID_VERSION" == "android16" && "$INPUT_KERNEL_VERSION" == "6.12" ]]; then
             if [[ "$CURRENT_SUB" -ge 58 ]]; then
               echo "临时调整 Android 16 6.12 exec.c 上下文"
               sed -i '/^#include <linux\/dma-buf.h>$/d' fs/exec.c
             fi
           fi
 
-          patch -p1 < 50_add_susfs_in_gki-${{ inputs.android_version }}-${{ inputs.kernel_version }}.patch || true
+          patch -p1 < 50_add_susfs_in_gki-$INPUT_ANDROID_VERSION-$INPUT_KERNEL_VERSION.patch || true
 
           # 主补丁应用后还原临时上下文，避免无关源码差异保留到最终产物
-          if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
+          if [[ "$INPUT_ANDROID_VERSION" == "android12" && "$INPUT_KERNEL_VERSION" == "5.10" ]]; then
             if [[ "$CURRENT_SUB" -le 43 ]]; then
               echo "还原 Android 12 5.10 base.c 临时调整"
               sed -i 's/^size_t this_len = min_t(size_t, count, PAGE_SIZE);$/int this_len = min_t(int, count, PAGE_SIZE);/' fs/proc/base.c
@@ -641,7 +657,7 @@ jobs:
             fi
           fi
 
-          if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
+          if [[ "$INPUT_ANDROID_VERSION" == "android13" && "$INPUT_KERNEL_VERSION" == "5.10" ]]; then
             if [[ "$CURRENT_SUB" -le 107 ]]; then
               echo "还原 Android 13 5.10 fdinfo.c 临时调整"
               perl -i -pe 's/^(\s+if \(inode\) \{)/$1\n\t\t\/\*\n\t\t * IN_ALL_EVENTS represents all of the mask bits\n\t\t * that we expose to userspace.  There is at\n\t\t * least one bit (FS_EVENT_ON_CHILD) which is\n\t\t * used only internally to the kernel.\n\t\t *\/\n\t\tu32 mask = mark->mask & IN_ALL_EVENTS;/m' fs/notify/fdinfo.c
@@ -650,7 +666,7 @@ jobs:
             fi
           fi
 
-          if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" ]]; then
+          if [[ "$INPUT_ANDROID_VERSION" == "android13" && "$INPUT_KERNEL_VERSION" == "5.15" ]]; then
             if [[ "$CURRENT_SUB" -le 41 ]]; then
               echo "还原 Android 13 5.15 临时调整"
               sed -i '/#include <linux\/mnt_idmapping.h>$/d' fs/namespace.c
@@ -663,7 +679,7 @@ jobs:
             fi
           fi
 
-          if [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "6.1" ]]; then
+          if [[ "$INPUT_ANDROID_VERSION" == "android14" && "$INPUT_KERNEL_VERSION" == "6.1" ]]; then
             if [[ "$CURRENT_SUB" -le 25 ]]; then
               sed -i '/^#include <trace\/hooks\/sched.h>$/d' fs/proc/base.c
             fi
@@ -677,7 +693,7 @@ jobs:
             fi
           fi
 
-          if [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
+          if [[ "$INPUT_ANDROID_VERSION" == "android15" && "$INPUT_KERNEL_VERSION" == "6.6" ]]; then
             if [[ "$CURRENT_SUB" -le 92 ]]; then
               echo "还原 Android 15 6.6 base.c 临时调整"
               sed -i '/^#include <linux\/dma-buf.h>$/d' fs/proc/base.c
@@ -688,18 +704,18 @@ jobs:
             fi
           fi
 
-          if [[ "${{ inputs.android_version }}" == "android16" && "${{ inputs.kernel_version }}" == "6.12" ]]; then
+          if [[ "$INPUT_ANDROID_VERSION" == "android16" && "$INPUT_KERNEL_VERSION" == "6.12" ]]; then
             if [[ "$CURRENT_SUB" -ge 58 ]] && ! grep -qF '#include <linux/dma-buf.h>' fs/exec.c; then
               echo "还原 Android 16 6.12 exec.c 临时调整"
               sed -i '0,/^#include /s//#include <linux\/dma-buf.h>\n&/' fs/exec.c
             fi
           fi
 
-          if [ "${{ inputs.ksu_variant }}" == "Official" ] || [ "${{ inputs.ksu_variant }}" == "Next" ] || [ "${{ inputs.ksu_variant }}" == "SukiSU" ] || [ "${{ inputs.ksu_variant }}" == "ZSU" ]; then
+          if [ "$INPUT_KSU_VARIANT" == "Official" ] || [ "$INPUT_KSU_VARIANT" == "Next" ] || [ "$INPUT_KSU_VARIANT" == "SukiSU" ] || [ "$INPUT_KSU_VARIANT" == "ZSU" ]; then
             # Android 12 - 5.10 修复
-            if [[ "${{ inputs.android_version }}" == "android12" && "${{ inputs.kernel_version }}" == "5.10" ]]; then
+            if [[ "$INPUT_ANDROID_VERSION" == "android12" && "$INPUT_KERNEL_VERSION" == "5.10" ]]; then
               # 修复 2024-11 分支: mmap.c 调用了 vm_flags_clear()，但同分支 mm.h 未提供 helper
-              if [[ "${{ inputs.os_patch_level }}" == "2024-11" ]] && grep -qF 'vm_flags_clear(new_vma, VM_PAD_MASK);' ./mm/mmap.c; then
+              if [[ "$INPUT_OS_PATCH_LEVEL" == "2024-11" ]] && grep -qF 'vm_flags_clear(new_vma, VM_PAD_MASK);' ./mm/mmap.c; then
                 sed -i 's/vm_flags_clear(new_vma, VM_PAD_MASK);/new_vma->vm_flags \&= ~VM_PAD_MASK;/' ./mm/mmap.c
               fi
                if [[ "$CURRENT_SUB" -le 209 ]]; then
@@ -713,12 +729,12 @@ jobs:
              fi
 
              # Android 13 - 5.15 修复
-            if [[ "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" ]]; then
+            if [[ "$INPUT_ANDROID_VERSION" == "android13" && "$INPUT_KERNEL_VERSION" == "5.15" ]]; then
               # 修复 2024-11 分支: mmap.c 调用了 vm_flags_clear()，但同分支 mm.h 未提供 helper
-              if [[ "${{ inputs.os_patch_level }}" == "2024-11" ]] && grep -qF 'vm_flags_clear(new_vma, VM_PAD_MASK);' ./mm/mmap.c; then
+              if [[ "$INPUT_OS_PATCH_LEVEL" == "2024-11" ]] && grep -qF 'vm_flags_clear(new_vma, VM_PAD_MASK);' ./mm/mmap.c; then
                 sed -i 's/vm_flags_clear(new_vma, VM_PAD_MASK);/new_vma->vm_flags \&= ~VM_PAD_MASK;/' ./mm/mmap.c
               fi
-               if [[ "$CURRENT_SUB" -le 148 && "${{ inputs.os_patch_level }}" != "2024-05" ]]; then
+               if [[ "$CURRENT_SUB" -le 148 && "$INPUT_OS_PATCH_LEVEL" != "2024-05" ]]; then
                  sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
                fi
                # 修复 5.15 ≤ .148: VMA_PAD_START 宏不存在，添加兼容定义
@@ -749,7 +765,7 @@ jobs:
             fi
 
             # Android 14 - 6.1 修复
-            if [[ "${{ inputs.android_version }}" == "android14" && "${{ inputs.kernel_version }}" == "6.1" ]]; then
+            if [[ "$INPUT_ANDROID_VERSION" == "android14" && "$INPUT_KERNEL_VERSION" == "6.1" ]]; then
               if grep -q 'susfs_is_current_proc_umounted\|SUSFS_IS_INODE_SUS_MAP\|SUSFS_IS_INODE_OPEN_REDIRECT' ./fs/proc/base.c && ! grep -qF '#include <linux/susfs_def.h>' ./fs/proc/base.c; then
                 if grep -qF '#include <linux/dma-buf.h>' ./fs/proc/base.c; then
                   sed -i '/#include <linux\/dma-buf.h>/a #if defined(CONFIG_KSU_SUSFS_SUS_MAP) || defined(CONFIG_KSU_SUSFS_OPEN_REDIRECT)\n#include <linux\/susfs_def.h>\n#endif' ./fs/proc/base.c
@@ -757,7 +773,7 @@ jobs:
                   sed -i '/#include <linux\/cpufreq_times.h>/a #if defined(CONFIG_KSU_SUSFS_SUS_MAP) || defined(CONFIG_KSU_SUSFS_OPEN_REDIRECT)\n#include <linux\/susfs_def.h>\n#endif' ./fs/proc/base.c
                 fi
               fi
-               if [[ "$CURRENT_SUB" -le 75 && "${{ inputs.os_patch_level }}" != "2024-05" ]]; then
+               if [[ "$CURRENT_SUB" -le 75 && "$INPUT_OS_PATCH_LEVEL" != "2024-05" ]]; then
                  sed -i -e 's/goto show_pad;/return 0;/' ./fs/proc/task_mmu.c
                fi
                # 修复 6.1 ≤ .75: VMA_PAD_START 宏不存在，添加兼容定义
@@ -777,7 +793,7 @@ jobs:
             fi
 
             # Android 15 - 6.6 修复
-            if [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
+            if [[ "$INPUT_ANDROID_VERSION" == "android15" && "$INPUT_KERNEL_VERSION" == "6.6" ]]; then
               # 修复 6.6.50~6.6.97: fs/proc/base.c 头部 hunk 失配，导致 susfs_def.h 漏打
               if grep -q 'AS_FLAGS_SUS_MAP\|susfs_is_current_proc_umounted\|SUSFS_IS_INODE_SUS_MAP\|SUSFS_IS_INODE_OPEN_REDIRECT' ./fs/proc/base.c && ! grep -qF 'susfs_def.h' ./fs/proc/base.c; then
                 if ! grep -qF '#include <linux/dma-buf.h>' ./fs/proc/base.c; then
@@ -798,7 +814,7 @@ jobs:
             fi
 
             # Android 16 - 6.12 修复
-            if [[ "${{ inputs.android_version }}" == "android16" && "${{ inputs.kernel_version }}" == "6.12" ]]; then
+            if [[ "$INPUT_ANDROID_VERSION" == "android16" && "$INPUT_KERNEL_VERSION" == "6.12" ]]; then
               # 修复 setuid_hook.c 重复定义
               SETUID_HOOK="$KERNEL_ROOT/common/drivers/kernelsu/setuid_hook.c"
               if [ -f "$SETUID_HOOK" ]; then
@@ -840,8 +856,8 @@ jobs:
         if: inputs.droidspaces != 'off'
         working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
-          KERNEL_VER="${{ inputs.kernel_version }}"
-          SLOT="${{ inputs.droidspaces }}"
+          KERNEL_VER="$INPUT_KERNEL_VERSION"
+          SLOT="$INPUT_DROIDSPACES"
 
           # 678 -> 6_7_8, 123 -> 1_2_3, 345 -> 3_4_5
           SLOT_NAME=$(echo "$SLOT" | sed 's/\(.\)/\1_/g; s/_$//')
@@ -952,7 +968,7 @@ jobs:
             fi
           }
 
-          if [[ "${{ inputs.android_version }}" == "android15" && "${{ inputs.kernel_version }}" == "6.6" ]]; then
+          if [[ "$INPUT_ANDROID_VERSION" == "android15" && "$INPUT_KERNEL_VERSION" == "6.6" ]]; then
             # 1. 开启用户命名空间（必须）
             # enable_config_if_defined CONFIG_USER_NS
             # 2. 关闭安卓严格网络控制（必须）
@@ -965,10 +981,10 @@ jobs:
         run: |
           set -e
           echo "=== 开始注入 NTSync 内核补丁 ==="
-          echo "Android 版本: ${{ inputs.android_version }}"
-          echo "Kernel 版本: ${{ inputs.kernel_version }}"
+          echo "Android 版本: $INPUT_ANDROID_VERSION"
+          echo "Kernel 版本: $INPUT_KERNEL_VERSION"
 
-          case "${{ inputs.android_version }}-${{ inputs.kernel_version }}" in
+          case "$INPUT_ANDROID_VERSION-$INPUT_KERNEL_VERSION" in
             android12-5.10)
               NTSYNC_PATCH="ntsync_compat_android12-5.10"
               ;;
@@ -985,7 +1001,7 @@ jobs:
               NTSYNC_PATCH="ntsync_compat_android16-6.12"
               ;;
             *)
-              echo "::warning::NTSync: 未适配 ${{ inputs.android_version }} / ${{ inputs.kernel_version }}，跳过补丁"
+              echo "::warning::NTSync: 未适配 $INPUT_ANDROID_VERSION / $INPUT_KERNEL_VERSION，跳过补丁"
               exit 0
               ;;
           esac
@@ -1018,7 +1034,7 @@ jobs:
         if: inputs.enable_susfs
         working-directory: ${{ env.KERNEL_ROOT }}/common
         run: |
-          if [ "${{ inputs.kernel_version }}" = "5.10" ] || [ "${{ inputs.kernel_version }}" = "5.15" ]; then
+          if [ "$INPUT_KERNEL_VERSION" = "5.10" ] || [ "$INPUT_KERNEL_VERSION" = "5.15" ]; then
             patch -p1 --forward < "$ACTION_BUILD/patches/unicode_bypass_fix_6.1-.patch" || true
           else
             patch -p1 --forward < "$ACTION_BUILD/patches/unicode_bypass_fix_6.1+.patch" || true
@@ -1048,12 +1064,12 @@ jobs:
           cp -r $SUKISU_PATCHES/other/zram/lz4k/crypto/* ./crypto/
           cp -r $SUKISU_PATCHES/other/zram/lz4k_oplus ./lib/
 
-          cp $SUKISU_PATCHES/other/zram/zram_patch/${{ inputs.kernel_version }}/lz4kd.patch ./
+          cp $SUKISU_PATCHES/other/zram/zram_patch/$INPUT_KERNEL_VERSION/lz4kd.patch ./
           if ! patch -p1 -F 3 < lz4kd.patch; then
             echo "::warning::lz4kd.patch 应用失败，可能已应用或上下文不匹配"
           fi
 
-          cp $SUKISU_PATCHES/other/zram/zram_patch/${{ inputs.kernel_version }}/lz4k_oplus.patch ./
+          cp $SUKISU_PATCHES/other/zram/zram_patch/$INPUT_KERNEL_VERSION/lz4k_oplus.patch ./
           if ! patch -p1 -F 3 < lz4k_oplus.patch; then
             echo "::warning::lz4k_oplus.patch 应用失败，可能已应用或上下文不匹配"
           fi
@@ -1119,7 +1135,7 @@ jobs:
           CONFIG_FILE="$DEFCONFIG"
 
           # 5.10 需要额外基础配置
-          if [ "${{ inputs.kernel_version }}" = "5.10" ]; then
+          if [ "$INPUT_KERNEL_VERSION" = "5.10" ]; then
             cat >> "$CONFIG_FILE" <<'EOF'
           CONFIG_ZSMALLOC=y
           CONFIG_ZRAM=y
@@ -1130,7 +1146,7 @@ jobs:
           fi
 
           # 5.15 / 6.1：将模块改为内建
-          if [ "${{ inputs.kernel_version }}" != "6.6" ] && [ "${{ inputs.kernel_version }}" != "5.10" ]; then
+          if [ "$INPUT_KERNEL_VERSION" != "6.6" ] && [ "$INPUT_KERNEL_VERSION" != "5.10" ]; then
             if grep -q "CONFIG_ZSMALLOC" "$CONFIG_FILE"; then
               sed -i 's/CONFIG_ZSMALLOC=m/CONFIG_ZSMALLOC=y/g' "$CONFIG_FILE"
             else
@@ -1140,13 +1156,13 @@ jobs:
           fi
 
           # 6.6：将模块改为内建
-          if [ "${{ inputs.kernel_version }}" = "6.6" ]; then
+          if [ "$INPUT_KERNEL_VERSION" = "6.6" ]; then
             echo "CONFIG_ZSMALLOC=y" >> "$CONFIG_FILE"
             sed -i 's/CONFIG_ZRAM=m/CONFIG_ZRAM=y/g' "$CONFIG_FILE"
           fi
 
           # android14/15：从 modules.bzl 移除 zram/zsmalloc 模块声明
-          if [ "${{ inputs.android_version }}" = "android14" ] || [ "${{ inputs.android_version }}" = "android15" ]; then
+          if [ "$INPUT_ANDROID_VERSION" = "android14" ] || [ "$INPUT_ANDROID_VERSION" = "android15" ]; then
             sed -i 's/"drivers\/block\/zram\/zram\.ko",//g; s/"mm\/zsmalloc\.ko",//g' "$KERNEL_ROOT/common/modules.bzl"
           fi
 
@@ -1213,7 +1229,7 @@ jobs:
 
           # 启用内核版本宏
           REKERNEL_H="common/drivers/rekernel/rekernel.h"
-          VERSION_MACRO="KERNEL_$(echo "${{ inputs.kernel_version }}" | tr '.' '_')"
+          VERSION_MACRO="KERNEL_$(echo "$INPUT_KERNEL_VERSION" | tr '.' '_')"
           if grep -q "^// #define ${VERSION_MACRO}$" "$REKERNEL_H"; then
             sed -i "s|^// #define ${VERSION_MACRO}$|#define ${VERSION_MACRO}|" "$REKERNEL_H"
           fi
@@ -1238,8 +1254,8 @@ jobs:
           CONFIG_TMPFS_POSIX_ACL=y
           EOF
 
-          if [ "${{ inputs.ksu_variant }}" == "SukiSU" ] || [ "${{ inputs.ksu_variant }}" == "ZSU" ] || [ "${{ inputs.ksu_variant }}" == "Next" ]; then
-            if [[ "${{ inputs.use_kpm }}" == enabled* ]] || [[ "${{ inputs.use_kpm }}" == patched* ]]; then
+          if [ "$INPUT_KSU_VARIANT" == "SukiSU" ] || [ "$INPUT_KSU_VARIANT" == "ZSU" ] || [ "$INPUT_KSU_VARIANT" == "Next" ]; then
+            if [[ "$INPUT_USE_KPM" == enabled* ]] || [[ "$INPUT_USE_KPM" == patched* ]]; then
               if ! grep -RqsE '^[[:space:]]*config[[:space:]]+KPM([[:space:]]|$)' common KernelSU 2>/dev/null; then
                 echo "错误: 已请求启用 KPM，但当前 KernelSU 代码未声明 CONFIG_KPM" >&2
                 exit 1
@@ -1248,11 +1264,11 @@ jobs:
             fi
           fi
 
-          CURRENT_SUB="${{ inputs.sub_level }}"
+          CURRENT_SUB="$INPUT_SUB_LEVEL"
           if [[ ! "$CURRENT_SUB" =~ ^[0-9]+$ ]]; then
             CURRENT_SUB=99999
           fi
-          if [[ "${{ inputs.ksu_variant }}" == "ZSU" && "${{ inputs.android_version }}" == "android13" && "${{ inputs.kernel_version }}" == "5.15" && "$CURRENT_SUB" -ge 74 && "$CURRENT_SUB" -le 137 ]]; then
+          if [[ "$INPUT_KSU_VARIANT" == "ZSU" && "$INPUT_ANDROID_VERSION" == "android13" && "$INPUT_KERNEL_VERSION" == "5.15" && "$CURRENT_SUB" -ge 74 && "$CURRENT_SUB" -le 137 ]]; then
             {
               echo "CONFIG_KALLSYMS=y"
               echo "CONFIG_KALLSYMS_ALL=y"
@@ -1303,23 +1319,23 @@ jobs:
           fi
 
           # 配置内核名称
-          if [ -n "${{ inputs.version }}" ]; then
-            CLEAN_VERSION=$(echo "${{ inputs.version }}" | sed -E 's/^[0-9]+\.[0-9]+\.[0-9]+//')
+          if [ -n "$INPUT_VERSION" ]; then
+            CLEAN_VERSION=$(echo "$INPUT_VERSION" | sed -E 's/^[0-9]+\.[0-9]+\.[0-9]+//')
             
             # 定义 KMI_TAG（与自动版本保持一致）
-            case "${{ inputs.android_version }}-${{ inputs.kernel_version }}" in
+            case "$INPUT_ANDROID_VERSION-$INPUT_KERNEL_VERSION" in
               "android14-6.1")  KMI_TAG="android14-11" ;;
               "android15-6.6")  KMI_TAG="android15-8" ;;
               "android16-6.12") KMI_TAG="android16-5" ;;
-              *) KMI_TAG="${{ inputs.android_version }}" ;;
+              *) KMI_TAG="$INPUT_ANDROID_VERSION" ;;
             esac
             
-            if [ "${{ inputs.kernel_version }}" = "6.1" ]; then
+            if [ "$INPUT_KERNEL_VERSION" = "6.1" ]; then
               # 6.1：旧格式，包含 KMI_TAG
               KMI_LOCAL="-${KMI_TAG}${CLEAN_VERSION}"
               sed -i "\$s|echo \"\$res\"|echo \"${KMI_LOCAL}\"|" ./common/scripts/setlocalversion 2>/dev/null || true
               sed -i "/^CONFIG_LOCALVERSION=/ s/=\"[^\"]*\"/=\"${KMI_LOCAL}\"/" ./common/arch/arm64/configs/gki_defconfig 2>/dev/null || true
-            elif [ "${{ inputs.kernel_version }}" = "5.10" ] || [ "${{ inputs.kernel_version }}" = "5.15" ]; then
+            elif [ "$INPUT_KERNEL_VERSION" = "5.10" ] || [ "$INPUT_KERNEL_VERSION" = "5.15" ]; then
               # 5.x：旧格式，不包含 KMI_TAG
               sed -i "\$s|echo \"\$res\"|echo \"${CLEAN_VERSION}\"|" ./common/scripts/setlocalversion 2>/dev/null || true
               sed -i '/^CONFIG_LOCALVERSION=/ s/="\([^"]*\)"/="'"$CLEAN_VERSION"'"/' ./common/arch/arm64/configs/gki_defconfig
@@ -1333,14 +1349,14 @@ jobs:
             BID="ab$((RANDOM % 90000000 + 10000000))"
             GHASH=$(git rev-parse --verify HEAD | cut -c1-13)
             # 统一内核名称格式：-androidXX-KMI-gHASH-BID-4k
-            case "${{ inputs.android_version }}-${{ inputs.kernel_version }}" in
+            case "$INPUT_ANDROID_VERSION-$INPUT_KERNEL_VERSION" in
               "android14-6.1")  KMI_TAG="android14-11" ;;
               "android15-6.6")  KMI_TAG="android15-8" ;;
               "android16-6.12") KMI_TAG="android16-5" ;;
-              *) KMI_TAG="${{ inputs.android_version }}" ;;
+              *) KMI_TAG="$INPUT_ANDROID_VERSION" ;;
             esac
 
-            if [ "${{ inputs.kernel_version }}" = "6.1" ]; then
+            if [ "$INPUT_KERNEL_VERSION" = "6.1" ]; then
               # 6.1：通过 setlocalversion 注入版本名称（旧格式）
               KMI_LOCAL="-${KMI_TAG}-g${GHASH}-${BID}-4k"
               sed -i "\$s|echo \"\$res\"|echo \"${KMI_LOCAL}\"|" ./scripts/setlocalversion 2>/dev/null || true
@@ -1358,7 +1374,7 @@ jobs:
         shell: bash
         run: |
           # 读取输入：输入 N/n 或留空时，使用当前 UTC 时间
-          INPUT_TIME="${{ inputs.build_time }}"
+          INPUT_TIME="$INPUT_BUILD_TIME"
           if [[ -n "$INPUT_TIME" && "$INPUT_TIME" != "N" && "$INPUT_TIME" != "n" ]]; then
             DATESTR="$INPUT_TIME"
           else
@@ -1373,7 +1389,7 @@ jobs:
           # 统一处理 mkcompile_h 补丁
           f="$KERNEL_ROOT/common/scripts/mkcompile_h"
           if [ -f "$f" ]; then
-            if [[ "${{ inputs.kernel_version }}" == "5.10" || "${{ inputs.kernel_version }}" == "5.15" ]]; then
+            if [[ "$INPUT_KERNEL_VERSION" == "5.10" || "$INPUT_KERNEL_VERSION" == "5.15" ]]; then
               echo "应用 5.x 经典时间戳补丁: $f"
               perl -pi -e "s{UTS_VERSION=\"\\\$\(echo \\\$UTS_VERSION \\\$CONFIG_FLAGS \\\$TIMESTAMP \\| cut -b -\\\$UTS_LEN\)\"}{UTS_VERSION=\"#1 SMP PREEMPT $DATESTR\"}" "$f"
             else
@@ -1413,7 +1429,7 @@ jobs:
             if [ -f "build/build.sh" ]; then
               # 5.x 内核使用传统构建脚本
               LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="/usr/bin/ccache clang" || exit 1
-              strings "out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist/Image" | grep 'Linux version'
+              strings "out/$INPUT_ANDROID_VERSION-$INPUT_KERNEL_VERSION/dist/Image" | grep 'Linux version'
             else
               # 6.1+ 内核使用 Bazel 构建
               # 提取 gki_defconfig 修改到 fragment，避免 bazel trim 检查失败
@@ -1430,7 +1446,7 @@ jobs:
               fi
               # 6.12+ 使用 lto=none（Rust 内核模块不兼容 thin LTO）
               LTO_FLAG="--lto=thin"
-              if [ "${{ inputs.kernel_version }}" = "6.12" ]; then
+              if [ "$INPUT_KERNEL_VERSION" = "6.12" ]; then
                 LTO_FLAG="--lto=none"
               fi
               tools/bazel build --disk_cache=/home/runner/.cache/bazel --config=fast $LTO_FLAG $FRAG_FLAG //common:kernel_aarch64_dist || exit 1
@@ -1448,8 +1464,8 @@ jobs:
       # 复制编译产物到工作目录，供 AnyKernel3 打包使用
       - name: 准备内核 Image
         run: |
-          if [ "${{ inputs.android_version }}" == "android12" ] || [ "${{ inputs.android_version }}" == "android13" ]; then
-            SRC_DIR="$KERNEL_ROOT/out/${{ inputs.android_version }}-${{ inputs.kernel_version }}/dist"
+          if [ "$INPUT_ANDROID_VERSION" == "android12" ] || [ "$INPUT_ANDROID_VERSION" == "android13" ]; then
+            SRC_DIR="$KERNEL_ROOT/out/$INPUT_ANDROID_VERSION-$INPUT_KERNEL_VERSION/dist"
           else
             SRC_DIR="$KERNEL_ROOT/bazel-bin/common/kernel_aarch64"
           fi
@@ -1460,7 +1476,7 @@ jobs:
       - name: 创建 AnyKernel3 压缩包
         run: |
           cd $ANYKERNEL3
-          ZIP_NAME="${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-AnyKernel3.zip"
+          ZIP_NAME="$INPUT_ANDROID_VERSION-$INPUT_KERNEL_VERSION.$INPUT_SUB_LEVEL-$INPUT_OS_PATCH_LEVEL-AnyKernel3.zip"
           mv ../Image ./Image
           zip -r "../$ZIP_NAME" ./*
 
@@ -1470,7 +1486,7 @@ jobs:
 #        if: inputs.android_version == 'android12'
 #        working-directory: bootimgs
 #        run: |
-#          GKI_URL=https://dl.google.com/android/gki/gki-certified-boot-android12-5.10-${{ inputs.os_patch_level }}_${{ inputs.revision }}.zip
+#          GKI_URL=https://dl.google.com/android/gki/gki-certified-boot-android12-5.10-$INPUT_OS_PATCH_LEVEL_$INPUT_REVISION.zip
 #          FALLBACK_URL=https://dl.google.com/android/gki/gki-certified-boot-android12-5.10-2023-01_r1.zip
 #
 #          status=$(curl -sL -w "%{http_code}" "$GKI_URL" -o /dev/null)
@@ -1486,19 +1502,19 @@ jobs:
 #          gzip -n -k -f -9 ./Image > ./Image.gz
 #
 #         # 创建普通 boot.img
-#          $MKBOOTIMG --header_version 4 --kernel Image --output boot.img --ramdisk out/ramdisk --os_version 12.0.0 --os_patch_level "${{ inputs.os_patch_level }}"
+#          $MKBOOTIMG --header_version 4 --kernel Image --output boot.img --ramdisk out/ramdisk --os_version 12.0.0 --os_patch_level "$INPUT_OS_PATCH_LEVEL"
 #          $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
-#          cp ./boot.img ../${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot.img
+#          cp ./boot.img ../$INPUT_ANDROID_VERSION-$INPUT_KERNEL_VERSION.$INPUT_SUB_LEVEL-$INPUT_OS_PATCH_LEVEL-boot.img
 #
 #          # 创建 gzip 压缩的 boot.img
-#          $MKBOOTIMG --header_version 4 --kernel Image.gz --output boot-gz.img --ramdisk out/ramdisk --os_version 12.0.0 --os_patch_level "${{ inputs.os_patch_level }}"
+#          $MKBOOTIMG --header_version 4 --kernel Image.gz --output boot-gz.img --ramdisk out/ramdisk --os_version 12.0.0 --os_patch_level "$INPUT_OS_PATCH_LEVEL"
 #          $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-gz.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
-#          cp ./boot-gz.img ../${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot-gz.img
+#          cp ./boot-gz.img ../$INPUT_ANDROID_VERSION-$INPUT_KERNEL_VERSION.$INPUT_SUB_LEVEL-$INPUT_OS_PATCH_LEVEL-boot-gz.img
 #
 #          # 创建 lz4 压缩的 boot.img
-#          $MKBOOTIMG --header_version 4 --kernel Image.lz4 --output boot-lz4.img --ramdisk out/ramdisk --os_version 12.0.0 --os_patch_level "${{ inputs.os_patch_level }}"
+#          $MKBOOTIMG --header_version 4 --kernel Image.lz4 --output boot-lz4.img --ramdisk out/ramdisk --os_version 12.0.0 --os_patch_level "$INPUT_OS_PATCH_LEVEL"
 #          $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-lz4.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
-#          cp ./boot-lz4.img ../${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot-lz4.img
+#          cp ./boot-lz4.img ../$INPUT_ANDROID_VERSION-$INPUT_KERNEL_VERSION.$INPUT_SUB_LEVEL-$INPUT_OS_PATCH_LEVEL-boot-lz4.img
 #
 #      # ==================== 构建 Boot 镜像 (Android 13+) ====================
 #      # Android 13 及以上版本不需要 ramdisk
@@ -1511,17 +1527,17 @@ jobs:
 #          # 创建普通 boot.img
 #          $MKBOOTIMG --header_version 4 --kernel Image --output boot.img
 #          $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
-#          cp ./boot.img ../${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot.img
+#          cp ./boot.img ../$INPUT_ANDROID_VERSION-$INPUT_KERNEL_VERSION.$INPUT_SUB_LEVEL-$INPUT_OS_PATCH_LEVEL-boot.img
 #
 #          # 创建 gzip 压缩的 boot.img
 #          $MKBOOTIMG --header_version 4 --kernel Image.gz --output boot-gz.img
 #          $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-gz.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
-#          cp ./boot-gz.img ../${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot-gz.img
+#          cp ./boot-gz.img ../$INPUT_ANDROID_VERSION-$INPUT_KERNEL_VERSION.$INPUT_SUB_LEVEL-$INPUT_OS_PATCH_LEVEL-boot-gz.img
 #
 #          # 创建 lz4 压缩的 boot.img
 #          $MKBOOTIMG --header_version 4 --kernel Image.lz4 --output boot-lz4.img
 #          $AVBTOOL add_hash_footer --partition_name boot --partition_size $((64 * 1024 * 1024)) --image boot-lz4.img --algorithm SHA256_RSA2048 --key $BOOT_SIGN_KEY_PATH
-#          cp ./boot-lz4.img ../${{ inputs.android_version }}-${{ inputs.kernel_version }}.${{ inputs.sub_level }}-${{ inputs.os_patch_level }}-boot-lz4.img
+#          cp ./boot-lz4.img ../$INPUT_ANDROID_VERSION-$INPUT_KERNEL_VERSION.$INPUT_SUB_LEVEL-$INPUT_OS_PATCH_LEVEL-boot-lz4.img
 #
       # ==================== 收集补丁冲突文件 ====================
       # 收集所有 .rej 文件用于调试补丁失败问题
