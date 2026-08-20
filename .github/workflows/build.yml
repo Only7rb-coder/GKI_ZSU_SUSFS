@@ -815,6 +815,13 @@ jobs:
                 fi
                 echo "已修复 exec.c 缺少 susfs_def.h 问题"
               fi
+
+              # 兼容 Android 16/6.12：该分支的 getname_flags() 仅接受两个参数，
+              # 而 SUSFS/上游上下文可能保留旧版的第三个 NULL 参数。
+              if grep -qF 'fname = getname_flags(filename, lookup_flags, NULL);' ./fs/open.c; then
+                sed -i 's/fname = getname_flags(filename, lookup_flags, NULL);/fname = getname_flags(filename, lookup_flags);/' ./fs/open.c
+                echo "已修复 Android 16/6.12 open.c 中 getname_flags 参数不兼容问题"
+              fi
             fi
           fi
 
