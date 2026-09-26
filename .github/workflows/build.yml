@@ -341,9 +341,39 @@ jobs:
           fi
 
           # AOSP has many independent repositories and runner network bursts can
-          # cause transient fetch failures. Bound concurrency and retry fetches.
-          REPO_SYNC_JOBS="${REPO_SYNC_JOBS:-8}"
-          $REPO --trace sync -c -j"$REPO_SYNC_JOBS" --retry-fetches=3 --no-tags --fail-fast
+          # cause transient fetch failures. Use a fast first pass, then fall back
+          # to a serialized sync so one overloaded connection does not fail the
+          # whole matrix job. HTTP/1.1 is more reliable for large AOSP fetches.
+          git config --global http.version HTTP/1.1
+          REPO_SYNC_JOBS="${REPO_SYNC_JOBS:-4}"
+          sync_ok=false
+          for attempt in 1 2 3; do
+            echo "AOSP repo sync attempt ${attempt}/3 (jobs=${REPO_SYNC_JOBS})"
+            if $REPO sync -c -j"$REPO_SYNC_JOBS" --retry-fetches=5 --no-tags; then
+              sync_ok=true
+              break
+            fi
+            echo "AOSP repo sync attempt ${attempt} failed; waiting before retry..."
+            sleep $((attempt * 15))
+          done
+
+          if [ "$sync_ok" != true ]; then
+            echo "Parallel AOSP sync did not complete; retrying serially..."
+            for attempt in 1 2; do
+              echo "AOSP serial sync attempt ${attempt}/2"
+              if $REPO sync -c -j1 --retry-fetches=10 --no-tags; then
+                sync_ok=true
+                break
+              fi
+              echo "AOSP serial sync attempt ${attempt} failed; waiting before retry..."
+              sleep $((attempt * 30))
+            done
+          fi
+
+          if [ "$sync_ok" != true ]; then
+            echo "::error::AOSP repository synchronization failed after all retries"
+            exit 1
+          fi
           echo "REMOTE_BRANCH=$REMOTE_BRANCH" >> $GITHUB_ENV
 
       # ==================== 伪装 /proc/config.gz（自动检测） ====================
