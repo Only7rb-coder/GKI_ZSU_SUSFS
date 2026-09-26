@@ -301,6 +301,13 @@ jobs:
             fi
           fi
 
+          SUSFS_VERSION=$(awk -F= '$1 == "version" { print $2; exit }' susfs4ksu/ksu_module_susfs/module.prop)
+          if [ "$SUSFS_VERSION" != "v2.3.0" ]; then
+            echo "::error::Expected SUSFS v2.3.0, got ${SUSFS_VERSION:-unknown}"
+            exit 1
+          fi
+          echo "SUSFS version verified: $SUSFS_VERSION"
+
           SUSFS_LATEST_COMMIT_DATE=$(git -C susfs4ksu log -1 --date=format:'%Y-%m-%d %H:%M:%S %z' --format='%cd')
           echo "SUSFS_LATEST_COMMIT_DATE=$SUSFS_LATEST_COMMIT_DATE" >> $GITHUB_ENV
           echo "SUSFS 仓库最新提交日期: $SUSFS_LATEST_COMMIT_DATE"

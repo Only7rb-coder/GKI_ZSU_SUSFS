@@ -13,16 +13,15 @@
 # ================================================================
 
 # 是否启用自定义提交 (true/false)
-custom=false
-
+# Keep builds reproducible on SUSFS v2.3.0 instead of following a moving branch.
+custom=true
 # ==================== SUSFS 各分支的 commit hash ====================
 # 仅当 custom=true 时生效
-gki-android12-5.10=
-gki-android13-5.15=
-gki-android14-6.1=
-gki-android15-6.6=
-gki-android16-6.12=
-
+gki-android12-5.10=9892175b4acec7ee844e113b8d02c0f4d12cdfac
+gki-android13-5.15=687d2d18d94cb2e3e72d1074778d58384d58e379
+gki-android14-6.1=24743360ea08d98f6ad72b856851abed8de5854f
+gki-android15-6.6=a0f9c59e2243f8a5db955f4ad1686d5e0ad26e1a
+gki-android16-6.12=b213c54126fb243595ce7876e91d84d6e0861fec
 # ==================== ZSU 的 commit hash ====================
 # 仅当 custom=true 且使用 ZSU 变体时生效
 zsu=

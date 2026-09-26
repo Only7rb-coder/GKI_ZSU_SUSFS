@@ -8,7 +8,7 @@
 [![Release](https://img.shields.io/github/v/release/Only7rb-coder/GKI_ZSU_SUSFS?label=Release&style=flat-square&logo=github&logoColor=white&color=2ea44f)](https://github.com/Only7rb-coder/GKI_ZSU_SUSFS/releases)
 [![Telegram](https://img.shields.io/static/v1?label=Telegram&message=Channel&color=0088cc)](https://t.me/ZSUKernelBuilds)
 [![ZSU](https://img.shields.io/badge/ZSU-Supported-5AA300?style=flat-square)](https://kernelsu.org/)
-[![SUSFS](https://img.shields.io/badge/SUSFS-Integrated-E67E22?style=flat-square)](https://gitlab.com/simonpunk/susfs4ksu)
+[![SUSFS](https://img.shields.io/badge/SUSFS-v2.3.0-E67E22?style=flat-square)](https://gitlab.com/simonpunk/susfs4ksu)
 
 ---
 

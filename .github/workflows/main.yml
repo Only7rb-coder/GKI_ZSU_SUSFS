@@ -494,7 +494,7 @@ jobs:
           SUS_VERSION="${{ needs.get-manager.outputs.susVer }}"
           if [ -z "$SUS_VERSION" ]; then
             echo "警告: 未获取到 SUSFS 版本，使用默认版本号"
-            SUS_VERSION="1.0.0"
+            SUS_VERSION="v2.3.0"
           fi
 
           LATEST_TAG=$(gh api repos/$REPO_OWNER/$REPO_NAME/tags --jq '.[0].name' 2>/dev/null | sed 's/-.*//' || echo "")

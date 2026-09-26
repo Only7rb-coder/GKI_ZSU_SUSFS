@@ -79,6 +79,10 @@ jobs:
           # 计算SUSFS版本号
           INFO="https://gitlab.com/simonpunk/susfs4ksu/-/raw/gki-android14-6.1/ksu_module_susfs/module.prop\?ref_type\=heads"
           SUS_VERSION=$(curl -s $INFO | awk -F '=' '$1 == "version" { print $2 }')
+          if [ "$SUS_VERSION" != "v2.3.0" ]; then
+            echo "::error::Expected SUSFS v2.3.0, got ${SUS_VERSION:-unknown}"
+            exit 1
+          fi
           echo $SUS_VERSION
 
           # 导出这两个值给release
