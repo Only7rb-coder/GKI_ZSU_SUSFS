@@ -340,7 +340,10 @@ jobs:
             sed -i "s/\"${FORMATTED_BRANCH}\"/\"deprecated\/${FORMATTED_BRANCH}\"/g" $DEFAULT_MANIFEST_PATH
           fi
 
-          $REPO --trace sync -c -j$(nproc --all) --no-tags --fail-fast
+          # AOSP has many independent repositories and runner network bursts can
+          # cause transient fetch failures. Bound concurrency and retry fetches.
+          REPO_SYNC_JOBS="${REPO_SYNC_JOBS:-8}"
+          $REPO --trace sync -c -j"$REPO_SYNC_JOBS" --retry-fetches=3 --no-tags --fail-fast
           echo "REMOTE_BRANCH=$REMOTE_BRANCH" >> $GITHUB_ENV
 
       # ==================== 伪装 /proc/config.gz（自动检测） ====================
