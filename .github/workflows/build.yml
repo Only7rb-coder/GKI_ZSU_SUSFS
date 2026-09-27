@@ -495,9 +495,9 @@ jobs:
             BRANCH="-s $branch_input"
             echo "使用自定义分支/提交: $branch_input"
           else
-            # ZSU Manager v1.3.10 uses UAPI 2. KernelSU-Next v3.3.0 is
-            # the matching driver; newer dev-susfs builds use UAPI 4.
-            BRANCH="-s v3.3.0"
+            # ZSU Manager v1.3.10 uses UAPI 2. The SUSFS-capable branch is
+            # based on the same ABI; normalize its additive UAPI marker below.
+            BRANCH="-s dev-susfs"
           fi
 
           echo "BRANCH=$BRANCH" >> $GITHUB_ENV
@@ -511,7 +511,7 @@ jobs:
           echo "添加 SUSFS-capable KernelSU Next..."
           # Use the maintained SUSFS-capable KernelSU Next base, then add the
           # private ZSU manager certificate to its accepted manager list.
-          KSU_REF="${INPUT_KSU_BRANCH:-v3.3.0}"
+          KSU_REF="${INPUT_KSU_BRANCH:-dev-susfs}"
           echo "Using KernelSU-Next ref: $KSU_REF"
           curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh" | bash -s "$KSU_REF"
 
@@ -522,6 +522,20 @@ jobs:
           else
             echo "KSU_LATEST_COMMIT_DATE=未知" >> $GITHUB_ENV
           fi
+
+          # dev-susfs adds the bundled-manager flag and advertises UAPI 4,
+          # while the ZSU v1.3.10 manager is UAPI 2. The ioctl layouts remain
+          # compatible; keep the driver marker aligned with the shipped APK.
+          KSU_UAPI_HEADER="$(find "$KERNEL_ROOT/KernelSU-Next" -path '*/uapi/supercall.h' -print -quit)"
+          if [ -z "$KSU_UAPI_HEADER" ]; then
+            echo "::error::KernelSU UAPI header not found"
+            exit 1
+          fi
+          if grep -q 'KERNEL_SU_UAPI_VERSION = 4' "$KSU_UAPI_HEADER"; then
+            sed -i 's/KERNEL_SU_UAPI_VERSION = 4/KERNEL_SU_UAPI_VERSION = 2/' "$KSU_UAPI_HEADER"
+          fi
+          grep -q 'KERNEL_SU_UAPI_VERSION = 2' "$KSU_UAPI_HEADER"
+          echo "KernelSU UAPI normalized to 2: $KSU_UAPI_HEADER"
 
           KSU_KBUILD="$KERNEL_ROOT/KernelSU-Next/kernel/Kbuild"
           ZSU_MANAGER_SIZE="0x318"
