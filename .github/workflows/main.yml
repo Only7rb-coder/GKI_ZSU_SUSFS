@@ -39,9 +39,9 @@ on:
       # ==================== KernelSU 配置 ====================
       # KernelSU 变体固定为 ZSU
       kernelsu_branch:
-        description: "ZSU branch (main/dev/自定义，留空使用main)"
+        description: "KernelSU-Next ref (v3.3.0 matches ZSU manager UAPI 2)"
         type: string
-        default: "main"
+        default: "v3.3.0"
         required: false
 
       # ==================== 可选配置 ====================

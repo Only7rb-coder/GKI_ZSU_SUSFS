@@ -495,8 +495,9 @@ jobs:
             BRANCH="-s $branch_input"
             echo "使用自定义分支/提交: $branch_input"
           else
-            # ZSU 默认使用 main 分支
-            BRANCH="-s main"
+            # ZSU Manager v1.3.10 uses UAPI 2. KernelSU-Next v3.3.0 is
+            # the matching driver; newer dev-susfs builds use UAPI 4.
+            BRANCH="-s v3.3.0"
           fi
 
           echo "BRANCH=$BRANCH" >> $GITHUB_ENV
@@ -510,7 +511,9 @@ jobs:
           echo "添加 SUSFS-capable KernelSU Next..."
           # Use the maintained SUSFS-capable KernelSU Next base, then add the
           # private ZSU manager certificate to its accepted manager list.
-          curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh" | bash -s dev-susfs
+          KSU_REF="${INPUT_KSU_BRANCH:-v3.3.0}"
+          echo "Using KernelSU-Next ref: $KSU_REF"
+          curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh" | bash -s "$KSU_REF"
 
           if [ -d "KernelSU-Next/.git" ]; then
             KSU_LATEST_COMMIT_DATE=$(git -C KernelSU-Next log -1 --date=format:'%Y-%m-%d %H:%M:%S %z' --format='%cd')

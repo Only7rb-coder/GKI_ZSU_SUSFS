@@ -89,8 +89,9 @@ jobs:
           echo "kversion=$KSU_VERSION" >> $GITHUB_OUTPUT
           echo "sversion=$SUS_VERSION" >> $GITHUB_OUTPUT
 
-      - name: 添加 KernelSU
-        id: add_KSU
+      - name: 添加 KernelSU (legacy artifact lookup disabled)
+        id: add_KSU_legacy
+        if: ${{ false }}
         continue-on-error: true
         run: |
           echo "ZSU..."
@@ -154,6 +155,19 @@ jobs:
             done
             rm -rf "$ZIP_NAME"
           done
+
+      - name: 下载当前 ZSU Manager release
+        id: add_KSU
+        run: |
+          set -euo pipefail
+          mkdir -p manager-artifacts
+          gh release download --repo Only7rb-coder/zsu --pattern 'ZSU_*.apk' --dir manager-artifacts
+          apk_count=$(find manager-artifacts -maxdepth 1 -type f -name '*.apk' | wc -l)
+          if [ "$apk_count" -lt 2 ]; then
+            echo "::error::Expected normal and spoofed ZSU Manager APKs, found $apk_count"
+            exit 1
+          fi
+          find manager-artifacts -maxdepth 1 -type f -name '*.apk' -print
 
       - name: 读取管理器实际版本
         id: manager_version
