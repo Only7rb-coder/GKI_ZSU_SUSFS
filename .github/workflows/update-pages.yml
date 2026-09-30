@@ -71,10 +71,10 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: dev
+          ref: main
 
       - name: Pull latest data
-        run: git pull origin dev
+        run: git pull origin main
 
       - name: Copy data to web directory
         run: cp -r data/ web/data/
