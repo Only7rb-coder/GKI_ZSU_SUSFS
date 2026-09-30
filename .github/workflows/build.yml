@@ -548,6 +548,22 @@ jobs:
           echo "Using KernelSU-Next ref: $KSU_REF"
           curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh" | bash -s "$KSU_REF"
 
+          # SUSFS is not integrated in every KernelSU-Next tag (notably
+          # v3.3.0). If SUSFS is enabled and the selected ref has no SUSFS
+          # Kconfig symbols, switch to the maintained SUSFS-capable branch
+          # instead of reaching Bazel with undeclared CONFIG_KSU_SUSFS_* flags.
+          if [ "$INPUT_ENABLE_SUSFS" = "true" ] && \
+             ! grep -qE '^[[:space:]]*config[[:space:]]+KSU_SUSFS([[:space:]]|$)' \
+             "$KERNEL_ROOT/KernelSU-Next/kernel/Kconfig"; then
+            echo "::warning::KernelSU ref $KSU_REF has no SUSFS Kconfig; falling back to dev-susfs"
+            git -C "$KERNEL_ROOT/KernelSU-Next" fetch --depth=1 origin dev-susfs
+            git -C "$KERNEL_ROOT/KernelSU-Next" checkout --detach FETCH_HEAD
+            grep -qE '^[[:space:]]*config[[:space:]]+KSU_SUSFS([[:space:]]|$)' \
+              "$KERNEL_ROOT/KernelSU-Next/kernel/Kconfig"
+            KSU_REF="dev-susfs"
+            echo "Using SUSFS-capable KernelSU-Next ref: $KSU_REF"
+          fi
+
           if [ -d "KernelSU-Next/.git" ]; then
             KSU_LATEST_COMMIT_DATE=$(git -C KernelSU-Next log -1 --date=format:'%Y-%m-%d %H:%M:%S %z' --format='%cd')
             echo "KSU_LATEST_COMMIT_DATE=$KSU_LATEST_COMMIT_DATE" >> $GITHUB_ENV
