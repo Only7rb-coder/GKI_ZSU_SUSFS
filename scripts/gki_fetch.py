@@ -3,6 +3,7 @@ import binascii
 import http.client
 import os
 import re
+import subprocess
 import time
 import urllib.error
 import urllib.request
@@ -32,6 +33,10 @@ TRANSIENT_ERRORS = (
     binascii.Error,
 )
 
+# Cache the public branch list once per run. The updater previously made a
+# request for every missing month, including branches that never existed.
+_BRANCH_CACHE: set[str] | None = None
+
 
 class FetchError(RuntimeError):
     """Raised when an upstream request fails after retries."""
@@ -59,7 +64,28 @@ def make_date_range(start: str, end: str) -> list[str]:
     return dates
 
 
-def try_fetch(url: str, attempts: int = 3) -> str | None:
+def available_branches() -> set[str]:
+    """Return live and deprecated branches without probing every month."""
+    global _BRANCH_CACHE
+    if _BRANCH_CACHE is not None:
+        return _BRANCH_CACHE
+    try:
+        output = subprocess.check_output(
+            ["git", "ls-remote", "--heads",
+             "https://android.googlesource.com/kernel/common"],
+            text=True, stderr=subprocess.STDOUT, timeout=45,
+        )
+    except (subprocess.SubprocessError, OSError) as error:
+        raise FetchError(f"failed to list AOSP branches: {error}") from error
+    _BRANCH_CACHE = {
+        line.rsplit("refs/heads/", 1)[1]
+        for line in output.splitlines()
+        if "refs/heads/" in line
+    }
+    return _BRANCH_CACHE
+
+
+def try_fetch(url: str, attempts: int = 5) -> str | None:
     """Fetch and decode a googlesource file; return None only for HTTP 404."""
     request = urllib.request.Request(url, headers={"User-Agent": "GKI-data-updater"})
     last_error: BaseException | None = None
@@ -74,11 +100,22 @@ def try_fetch(url: str, attempts: int = 3) -> str | None:
             if error.code == 404:
                 return None
             last_error = error
+            # Gitiles returns 429 when the runner probes too aggressively.
+            # Respect Retry-After when supplied, otherwise use exponential backoff.
+            if error.code not in (408, 425, 429) and error.code < 500:
+                raise FetchError(f"failed to fetch {url}: {error}") from error
+            retry_after = error.headers.get("Retry-After")
+            try:
+                delay = min(120, max(1, int(retry_after))) if retry_after else min(120, 2 ** attempt)
+            except (TypeError, ValueError):
+                delay = min(120, 2 ** attempt)
         except TRANSIENT_ERRORS as error:
             last_error = error
+            delay = min(120, 2 ** attempt)
 
         if attempt < attempts:
-            time.sleep(attempt)
+            print(f"  transient AOSP request failure; retrying in {delay}s", flush=True)
+            time.sleep(delay)
 
     raise FetchError(f"failed to fetch {url}: {last_error}")
 
@@ -92,12 +129,14 @@ def fetch_makefile(android_ver: str, kernel_ver: str, date: str,
     else:
         paths = [branch, f"deprecated/{branch}"]
 
+    branches = available_branches()
     for p in paths:
+        if p not in branches:
+            continue
         url = f"{BASE_URL}/{p}/Makefile?format=TEXT"
         text = try_fetch(url)
         if text is not None:
             return text
-        time.sleep(0.3)
     return None
 
 
