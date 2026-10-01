@@ -65,6 +65,11 @@ on:
           - "on"
         default: "off"
       droidspaces_ntsync:
+      build_bypass:
+        description: "同时构建普通内核和 Bypass 内核"
+        required: false
+        type: boolean
+        default: false
         description: "启用 Droidspaces 容器 NTSync 支持（需启用 Droidspaces）"
         required: false
         type: boolean
@@ -107,6 +112,11 @@ on:
         type: string
         default: "off"
       droidspaces_ntsync:
+      build_bypass:
+        description: "同时构建普通内核和 Bypass 内核"
+        required: false
+        type: boolean
+        default: false
         required: false
         type: boolean
         default: false
@@ -148,6 +158,7 @@ jobs:
       enable_susfs: ${{ !inputs.cancel_susfs }}
       droidspaces: ${{ inputs.droidspaces || 'off' }}
       droidspaces_ntsync: ${{ inputs.droidspaces_ntsync || false }}
+      build_bypass: ${{ inputs.build_bypass || false }}
 
   # 3. 仅在直接触发时运行，从 main.yml 调用时跳过
   get-ksu-manager:

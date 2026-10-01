@@ -85,6 +85,10 @@ on:
         required: false
         type: boolean
         default: false
+      build_bypass:
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build-kernel:
@@ -92,7 +96,7 @@ jobs:
     runs-on: ubuntu-latest
     # AOSP repo sync can be slow on some branches; allow the build to finish
     # instead of cancelling otherwise healthy matrix entries at one hour.
-    timeout-minutes: 120
+    timeout-minutes: ${{ inputs.build_bypass && 180 || 120 }}
 
     # ==================== 环境变量配置 ====================
     # ccache 配置用于加速重复编译
@@ -269,19 +273,24 @@ jobs:
       - name: 克隆依赖仓库
         run: |
           ANYKERNEL_BRANCH="master"
-          # Pin the header-v4/no-ramdisk fix so a mutable upstream branch cannot
-          # reintroduce "No ramdisk found to unpack" during flashing.
+          # Bypass mode uses the GKI 2.0 AnyKernel menu; normal mode remains ZSU-pinned.
+          ANYKERNEL_REPO="https://github.com/Only7rb-coder/ZSU-GKI-AnyKernel3.git"
           ANYKERNEL_COMMIT="6376962cd0651186d205ef287ff24f501398d6fd"
+          if [ "${{ inputs.build_bypass }}" = "true" ]; then
+            ANYKERNEL_REPO="https://github.com/WildKernels/AnyKernel3.git"
+            ANYKERNEL_BRANCH="gki-2.0"
+          fi
           SUSFS_BRANCH="gki-$INPUT_ANDROID_VERSION-$INPUT_KERNEL_VERSION"
 
           echo "克隆 AnyKernel3..."
-          git clone --depth 1 https://github.com/Only7rb-coder/ZSU-GKI-AnyKernel3.git -b "$ANYKERNEL_BRANCH" AnyKernel3
-          git -C AnyKernel3 fetch --depth 1 origin "$ANYKERNEL_COMMIT"
-          git -C AnyKernel3 checkout --detach "$ANYKERNEL_COMMIT"
-          # Android header-v4 GKI images may intentionally have RAMDISK_SZ=0.
-          # AnyKernel must split and flash them without requiring a ramdisk.
-          grep -q '^split_boot;$' AnyKernel3/anykernel.sh
-          ! grep -q '^dump_boot;$' AnyKernel3/anykernel.sh
+          git clone --depth 1 "$ANYKERNEL_REPO" -b "$ANYKERNEL_BRANCH" AnyKernel3
+          if [ "${{ inputs.build_bypass }}" != "true" ]; then
+            git -C AnyKernel3 fetch --depth 1 origin "$ANYKERNEL_COMMIT"
+            git -C AnyKernel3 checkout --detach "$ANYKERNEL_COMMIT"
+            # Android header-v4 GKI images may intentionally have RAMDISK_SZ=0.
+            grep -q '^split_boot;$' AnyKernel3/anykernel.sh
+            ! grep -q '^dump_boot;$' AnyKernel3/anykernel.sh
+          fi
           rm -rf AnyKernel3/.git
 
           echo "克隆 SUSFS (分支: $SUSFS_BRANCH)..."
@@ -1588,12 +1597,79 @@ jobs:
 
           cp "$SRC_DIR/Image" ./
 
+      # ==================== 激活 Bypass 构建 ====================
+      # Bypass only relaxes kernel module version validation; normal Image remains.
+      - name: 激活 Bypass 内核补丁
+        if: inputs.build_bypass
+        working-directory: ${{ env.KERNEL_ROOT }}
+        run: |
+          set -e
+          if [ -f "common/kernel/module/version.c" ] && grep -q 'bad_version:' "common/kernel/module/version.c"; then
+            TARGET_FILE="common/kernel/module/version.c"
+          elif [ -f "common/kernel/module.c" ] && grep -q 'bad_version:' "common/kernel/module.c"; then
+            TARGET_FILE="common/kernel/module.c"
+          else
+            echo "::error::未找到内核模块版本校验文件"
+            exit 1
+          fi
+          sed -i '/bad_version:/{:a;n;/return 0;/{s/return 0;/return 1;/;b};ba}' "$TARGET_FILE"
+          if ! sed -n '/bad_version:/,/return [01];/p' "$TARGET_FILE" | grep -q 'return 1;'; then
+            echo "::error::Bypass 补丁应用失败"
+            exit 1
+          fi
+
+      # ==================== 编译 Bypass 内核 ====================
+      - name: 构建 Bypass 内核
+        if: inputs.build_bypass
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          retry_on: timeout
+          command: |
+            set -ex
+            cd "$KERNEL_ROOT"
+            sed -i 's/BUILD_SYSTEM_DLKM=1/BUILD_SYSTEM_DLKM=0/' ./common/build.config.gki.aarch64
+            sed -i '/MODULES_ORDER=android\/gki_aarch64_modules/d' ./common/build.config.gki.aarch64
+            sed -i '/KMI_SYMBOL_LIST_STRICT_MODE/d' ./common/build.config.gki.aarch64
+            if [ -f "build/build.sh" ]; then
+              LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh CC="/usr/bin/ccache clang"
+              strings "out/$INPUT_ANDROID_VERSION-$INPUT_KERNEL_VERSION/dist/Image" | grep 'Linux version'
+            else
+              FRAG="common/arch/arm64/configs/ksu.fragment"
+              test -f "$FRAG"
+              cp "$DEFCONFIG.orig" "$DEFCONFIG"
+              FRAG_FLAG=""
+              [ ! -s "$FRAG" ] || FRAG_FLAG="--defconfig_fragment=//common:arch/arm64/configs/ksu.fragment"
+              LTO_FLAG="--lto=thin"
+              [ "$INPUT_KERNEL_VERSION" != "6.12" ] || LTO_FLAG="--lto=none"
+              tools/bazel build --disk_cache=/home/runner/.cache/bazel --config=fast $LTO_FLAG $FRAG_FLAG //common:kernel_aarch64_dist
+              strings ./bazel-bin/common/kernel_aarch64/Image | grep 'Linux version'
+            fi
+
+      # ==================== 准备 Bypass 内核 Image ====================
+      - name: 准备 Bypass 内核 Image
+        if: inputs.build_bypass
+        run: |
+          if [ "$INPUT_ANDROID_VERSION" = "android12" ] || [ "$INPUT_ANDROID_VERSION" = "android13" ]; then
+            SRC_DIR="$KERNEL_ROOT/out/$INPUT_ANDROID_VERSION-$INPUT_KERNEL_VERSION/dist"
+          else
+            SRC_DIR="$KERNEL_ROOT/bazel-bin/common/kernel_aarch64"
+          fi
+          test -f "$SRC_DIR/Image"
+          cp "$SRC_DIR/Image" ./Bypass-Image
+
       # ==================== 创建 AnyKernel3 压缩包 ====================
       - name: 创建 AnyKernel3 压缩包
         run: |
           cd $ANYKERNEL3
           ZIP_NAME="$INPUT_ANDROID_VERSION-$INPUT_KERNEL_VERSION.$INPUT_SUB_LEVEL-$INPUT_OS_PATCH_LEVEL-AnyKernel3.zip"
           mv ../Image ./Image
+          if [ "${{ inputs.build_bypass }}" = "true" ]; then
+            test -f ../Bypass-Image
+            mv ../Bypass-Image ./Bypass-Image
+            patch -p1 --forward < "$GITHUB_WORKSPACE/.github/patches/bypass.patch"
+          fi
           zip -r "../$ZIP_NAME" ./*
 
       # ==================== 构建 Boot 镜像 (Android 12) ====================
