@@ -62,12 +62,12 @@ on:
           - "345"
         default: "off"
       droidspaces_ntsync:
-      build_bypass:
-        description: "同时构建普通内核和 Bypass 内核"
+        description: "启用 Droidspaces 容器 NTSync 支持（需启用 Droidspaces）"
         required: false
         type: boolean
         default: false
-        description: "启用 Droidspaces 容器 NTSync 支持（需启用 Droidspaces）"
+      build_bypass:
+        description: "同时构建普通内核和 Bypass 内核"
         required: false
         type: boolean
         default: false
@@ -106,11 +106,11 @@ on:
         type: string
         default: "off"
       droidspaces_ntsync:
-      build_bypass:
-        description: "同时构建普通内核和 Bypass 内核"
         required: false
         type: boolean
         default: false
+      build_bypass:
+        description: "同时构建普通内核和 Bypass 内核"
         required: false
         type: boolean
         default: false
