@@ -1,126 +1,73 @@
-"""增量更新 GKI 内核版本数据。
+"""Incrementally refresh GKI version data and validate its schema."""
+from __future__ import annotations
+import copy, json, os, sys, time
+from gki_fetch import TARGETS, fetch_lts, fetch_makefile, get_end_date, json_path, make_date_range, parse_version
+from prepare_matrix import validate_data
 
-读取现有 JSON 数据，仅抓取缺失的月份，同时更新 LTS 版本。
-"""
-
-import json
-import os
-import time
-
-from gki_fetch import (
-    TARGETS, DATA_DIR,
-    make_date_range, get_end_date,
-    fetch_makefile, fetch_lts, parse_version, json_path,
-)
-
-
-def update_target(android_ver: str, kernel_ver: str,
-                  date_start: str, date_end: str | None,
-                  dep_cutoff: str) -> bool:
-    """增量更新单个目标，返回是否有数据变更"""
+def update_target(android_ver: str, kernel_ver: str, date_start: str, date_end: str | None, dep_cutoff: str) -> bool:
     path = json_path(android_ver, kernel_ver)
     end = get_end_date(date_end)
-    changed = False
-
-    # 读取现有数据
+    is_k510 = kernel_ver == '5.10'
     if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding='utf-8') as f:
             data = json.load(f)
-        entries = data.get("entries", [])
+        validate_data(data, path, android_ver, kernel_ver)
     else:
-        data = {
-            "android_version": android_ver,
-            "kernel_version": kernel_ver,
-            "lts": None,
-            "entries": [],
-        }
-        entries = []
-
-    # 确定需要抓取的日期范围
-    # 从 date_start 开始扫描，过滤掉已有日期，可自动填补之前遗漏的月份
-    existing_dates = {e["date"] for e in entries}
-    all_dates = make_date_range(date_start, end)
-    new_dates = [d for d in all_dates if d not in existing_dates]
-
-    if not new_dates:
-        print(f"  No new months to fetch")
-    else:
-        print(f"  Fetching {len(new_dates)} new month(s): {new_dates[0]} ~ {new_dates[-1]}")
-        for date in new_dates:
-            label = f"{android_ver}-{kernel_ver}-{date}"
-            print(f"    [{label}] ", end="", flush=True)
-
-            text = fetch_makefile(android_ver, kernel_ver, date, dep_cutoff)
-            if text is None:
-                print("not found, skip")
-                continue
-
-            ver = parse_version(text)
-            if ver is None:
-                print("parse failed, skip")
-                continue
-
-            version, patchlevel, sublevel = ver
-            detail = f"{version}.{patchlevel}.{sublevel}"
-            entries.append({"date": date, "kernel": detail})
-            changed = True
-            print(f"-> {detail}")
-            time.sleep(0.3)
-
-    # 按日期排序
-    entries.sort(key=lambda e: e["date"])
-
-    # 更新 LTS
-    lts_label = f"{android_ver}-{kernel_ver}-lts"
-    print(f"  [{lts_label}] ", end="", flush=True)
+        data = {'android_version': android_ver, 'kernel_version': kernel_ver, 'entries': []}
+        if not is_k510:
+            data['lts'] = None
+    original = copy.deepcopy(data)
+    entries = data.setdefault('entries', [])
+    existing = {e.get('date') for e in entries}
+    for date in make_date_range(date_start, end):
+        if date in existing:
+            continue
+        label = f'{android_ver}-{kernel_ver}-{date}'
+        print(f'    [{label}] ', end='', flush=True)
+        text = fetch_makefile(android_ver, kernel_ver, date, dep_cutoff)
+        if text is None:
+            print('not found, skip'); continue
+        ver = parse_version(text)
+        if ver is None:
+            raise RuntimeError(f'failed to parse Makefile for {label}')
+        entry = {'date': date, 'kernel': '.'.join(ver)}
+        if is_k510:
+            entry['revision'] = 'r1'
+        entries.append(entry)
+        print(f"-> {entry['kernel']}")
+        time.sleep(0.2)
+    entries.sort(key=lambda e: e.get('date',''))
     lts_text = fetch_lts(android_ver, kernel_ver)
     if lts_text is None:
-        print("not found, skip")
-    else:
-        ver = parse_version(lts_text)
-        if ver is None:
-            print("parse failed, skip")
-        else:
-            version, patchlevel, sublevel = ver
-            lts_value = f"{version}.{patchlevel}.{sublevel}"
-            old_lts = data.get("lts")
-            if old_lts != lts_value:
-                changed = True
-                print(f"-> {lts_value} (was {old_lts})")
-            else:
-                print(f"-> {lts_value} (unchanged)")
-            data["lts"] = lts_value
-
-    # 保存
-    data["entries"] = entries
+        raise RuntimeError(f'LTS branch not found: {android_ver}-{kernel_ver}-lts')
+    ver = parse_version(lts_text)
+    if ver is None:
+        raise RuntimeError(f'failed to parse LTS for {android_ver}/{kernel_ver}')
+    data['lts'] = '.'.join(ver)
+    if is_k510:
+        data.setdefault('lts_revision', 'r1')
+    validate_data(data, path, android_ver, kernel_ver)
+    changed = data != original
     if changed:
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-        print(f"  => Saved {len(entries)} entries to {path}")
+        tmp = path + '.tmp'
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False); f.write('\n')
+        os.replace(tmp, path)
+        print(f'  => Saved {len(entries)} entries to {path}')
     else:
-        print(f"  => No changes")
-
+        print('  => No changes')
     return changed
 
+def main() -> int:
+    changed = False
+    for (android_ver, kernel_ver), (start, end, cutoff) in TARGETS.items():
+        print(f'\n=== {android_ver} / {kernel_ver} ===')
+        changed |= update_target(android_ver, kernel_ver, start, end, cutoff)
+    print('\nData updated.' if changed else '\nAll data up-to-date.')
+    return 0
 
-def main():
-    any_changed = False
-    for (android_ver, kernel_ver), (date_start, date_end, dep_cutoff) in TARGETS.items():
-        print(f"\n=== {android_ver} / {kernel_ver} ===")
-        if update_target(android_ver, kernel_ver, date_start, date_end, dep_cutoff):
-            any_changed = True
-
-    print(f"\n{'Data updated.' if any_changed else 'All data up-to-date.'}")
-    return any_changed
-
-
-if __name__ == "__main__":
-    import sys
-    try:
-        changed = main()
-    except Exception as e:
-        print(f"\nFATAL: {e}", file=sys.stderr)
-        sys.exit(1)
-    # Exit 0 = data changed, 2 = no changes (both are success)
-    sys.exit(0 if changed else 2)
+if __name__ == '__main__':
+    try: sys.exit(main())
+    except Exception as error:
+        print(f'\nFATAL: {error}', file=sys.stderr); sys.exit(1)
