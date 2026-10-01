@@ -373,10 +373,21 @@ jobs:
           FORMATTED_BRANCH="$INPUT_ANDROID_VERSION-$INPUT_KERNEL_VERSION-$INPUT_OS_PATCH_LEVEL"
           echo "初始化 repo，分支: common-${FORMATTED_BRANCH}"
 
+          # Validate the exact common branch before repo init/sync. A stale matrix
+          # entry otherwise burns 60+ minutes retrying a branch that can never exist.
+          COMMON_REPO=https://android.googlesource.com/kernel/common
+          REMOTE_BRANCH=$(git ls-remote --heads "$COMMON_REPO" \
+            "refs/heads/${FORMATTED_BRANCH}" \
+            "refs/heads/deprecated/${FORMATTED_BRANCH}")
+          if [ -z "$REMOTE_BRANCH" ]; then
+            echo "::error::AOSP branch not found: ${FORMATTED_BRANCH}"
+            echo "Remove this stale target from the build matrix before retrying."
+            exit 1
+          fi
+
           $REPO init --depth=1 -u https://android.googlesource.com/kernel/manifest -b common-${FORMATTED_BRANCH} --repo-rev=v2.16
 
           # 检查是否为已弃用的分支
-          REMOTE_BRANCH=$(git ls-remote https://android.googlesource.com/kernel/common ${FORMATTED_BRANCH})
           DEFAULT_MANIFEST_PATH=.repo/manifests/default.xml
 
           if grep -q deprecated <<< $REMOTE_BRANCH; then
