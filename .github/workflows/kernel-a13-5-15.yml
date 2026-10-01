@@ -119,29 +119,11 @@ on:
         default: false
 
 jobs:
-  # 1. 前置准备任务：读取、去重并解析 5.15.json
   prepare-matrix:
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Read and Parse 5.15.json Matrix
-        id: set-matrix
-        run: |
-          # 修复 jq 的上下文混淆导致 Cannot index array with string "lts" 的 Bug
-          MATRIX_JSON=$(jq -c '
-            [
-              ( .entries | map({ sub_level: (.kernel | split(".") | .[2]), os_patch_level: .date }) | unique_by(.sub_level)[] ),
-              { sub_level: (.lts | split(".") | .[2]), os_patch_level: "lts" }
-            ]
-          ' ./data/android13/5.15.json)
-          
-          echo "matrix=${MATRIX_JSON}" >> $GITHUB_OUTPUT
-
-  # 2. 动态生成的内核编译主任务
+    uses: ./.github/workflows/prepare-matrix.yml
+    with:
+      data_file: data/android13/5.15.json
+      deduplicate_sublevels: true
   build-kernels-a13-5-15:
     needs: prepare-matrix
     name: "5.15.${{ matrix.sub_level }}-${{ matrix.os_patch_level }}"
