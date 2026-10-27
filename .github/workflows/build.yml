@@ -696,6 +696,23 @@ jobs:
               if [ -z "$SELINUX_HIDE" ]; then
                 echo "::warning::No KernelSU selinux_hide.c found; no SUSFS helper export adjustment was needed."
               else
+                # The Android 12-14 SUSFS GKI patches use a backup SELinux
+                # state named fake_state on kernels older than 6.6. The
+                # modern KernelSU-Next integration normally supplies this
+                # through its legacy KernelSU patch, which the ZSU path does
+                # not apply. Provide the same state here for those kernels.
+                if [ "$INPUT_KERNEL_VERSION" != "6.6" ] && [ "$INPUT_KERNEL_VERSION" != "6.12" ]; then
+                  if ! grep -q '^struct selinux_state fake_state;' "$SELINUX_HIDE"; then
+                    sed -i '/^static DEFINE_MUTEX(selinux_hide_mutex);/a\#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0)\nstruct selinux_state fake_state;\n#endif' "$SELINUX_HIDE"
+                  fi
+                  if ! grep -q 'fake_state.policy = backup_sepolicy;' "$SELINUX_HIDE"; then
+                    sed -i '/^    security_dump_masked_av_fn =/i\#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 6, 0)\n    fake_state.initialized = true;\n    fake_state.policy = backup_sepolicy;\n#endif' "$SELINUX_HIDE"
+                  fi
+                  grep -q '^struct selinux_state fake_state;' "$SELINUX_HIDE"
+                  grep -q 'fake_state.policy = backup_sepolicy;' "$SELINUX_HIDE"
+                  echo "Added pre-6.6 SUSFS fake SELinux state compatibility"
+                fi
+
                 sed -i \
                   -e 's/^static int security_context_to_sid_with_policy(/int security_context_to_sid_with_policy(/' \
                   -e 's/^static int security_sid_to_context_with_policy(/int security_sid_to_context_with_policy(/' \
