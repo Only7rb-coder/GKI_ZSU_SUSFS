@@ -339,6 +339,12 @@ jobs:
               if [ -n "$CUSTOM_COMMIT" ]; then
                 echo "切换 SUSFS 到自定义提交: $CUSTOM_COMMIT"
                 cd susfs4ksu
+                # The branch clone is intentionally shallow; fetch the pinned
+                # commit explicitly before checking it out.
+                if ! git fetch --depth 1 origin "$CUSTOM_COMMIT"; then
+                  echo "::error::Unable to fetch configured SUSFS commit: $CUSTOM_COMMIT"
+                  exit 1
+                fi
                 git checkout "$CUSTOM_COMMIT"
                 cd ..
               fi
