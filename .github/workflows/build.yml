@@ -603,13 +603,22 @@ jobs:
           # dev-susfs adds the bundled-manager flag and advertises UAPI 4,
           # while the ZSU v1.3.10 manager is UAPI 2. The ioctl layouts remain
           # compatible; keep the driver marker aligned with the shipped APK.
-          KSU_UAPI_HEADER="$(find "$KERNEL_ROOT/KernelSU-Next" -path '*/uapi/supercall.h' -print -quit)"
+          KSU_UAPI_HEADER=""
+          for candidate in \
+            "$KERNEL_ROOT/KernelSU-Next/kernel/include/uapi/supercall.h" \
+            "$KERNEL_ROOT/KernelSU-Next/uapi/supercall.h" \
+            "$KERNEL_ROOT/KernelSU-Next/manager/app/src/main/cpp/uapi/supercall.h"; do
+            if [ -f "$candidate" ]; then
+              KSU_UAPI_HEADER="$candidate"
+              break
+            fi
+          done
           if [ -z "$KSU_UAPI_HEADER" ]; then
             echo "::error::KernelSU UAPI header not found"
             exit 1
           fi
-          if grep -q 'KERNEL_SU_UAPI_VERSION = 4' "$KSU_UAPI_HEADER"; then
-            sed -i 's/KERNEL_SU_UAPI_VERSION = 4/KERNEL_SU_UAPI_VERSION = 2/' "$KSU_UAPI_HEADER"
+          if grep -qE 'KERNEL_SU_UAPI_VERSION[[:space:]]*=[[:space:]]*[0-9]+' "$KSU_UAPI_HEADER"; then
+            sed -i -E 's/KERNEL_SU_UAPI_VERSION[[:space:]]*=[[:space:]]*[0-9]+/KERNEL_SU_UAPI_VERSION = 2/' "$KSU_UAPI_HEADER"
           fi
           grep -q 'KERNEL_SU_UAPI_VERSION = 2' "$KSU_UAPI_HEADER"
           echo "KernelSU UAPI normalized to 2: $KSU_UAPI_HEADER"
